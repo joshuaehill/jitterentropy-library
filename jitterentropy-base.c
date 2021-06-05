@@ -1336,6 +1336,7 @@ struct rand_data *jent_entropy_collector_alloc(unsigned int osr,
 		entropy_collector->apt_cutoff = jent_apt_cutoff_lookup[ARRAY_SIZE(jent_apt_cutoff_lookup)-1];
 	} else {
 		entropy_collector->apt_cutoff = jent_apt_cutoff_lookup[osr-1];
+	}
 
 	/* Establish the lag global and local cutoffs based on the presumed entropy rate of 1/osr. */
 	if(osr >= ARRAY_SIZE(jent_lag_global_cutoff_lookup)) {
