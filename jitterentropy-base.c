@@ -1439,6 +1439,9 @@ static int jent_time_entropy_init(unsigned int enable_notime)
 	/* Required by jent_measure_jitter */
 	jent_common_timer_gcd = 1;
 
+	/* Setup the cutoff for the APT test. */
+	ec.apt_cutoff = jent_apt_cutoff_lookup[JENT_MIN_OSR - 1];
+
 	/* Setup the cutoff for the Lag test. */
 	ec.lag_global_cutoff = jent_lag_global_cutoff_lookup[JENT_MIN_OSR - 1];
 	ec.lag_local_cutoff = jent_lag_local_cutoff_lookup[JENT_MIN_OSR - 1];
