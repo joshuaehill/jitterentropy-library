@@ -117,12 +117,13 @@ unsigned int jent_version(void)
  *
  * @ec [in] Reference to entropy collector
  */
-static void jent_apt_reset(struct rand_data *ec, uint64_t current_delta)
+static void jent_apt_reset(struct rand_data *ec)
 {
 	/* Reset APT counter */
-	ec->apt_count = 0;
-	ec->apt_base = current_delta;
+	ec->apt_count = 0; /*Note that the first observation is not counted, so the SP 800-90B cutoff is one higher than we want.*/
 	ec->apt_observations = 0;
+	/*When reset, we need to accept the _next_ value input as the new base.*/
+	ec->apt_base_set = 0;
 }
 
 /**
@@ -143,14 +144,15 @@ static void jent_apt_insert(struct rand_data *ec, uint64_t current_delta)
 	if (current_delta == ec->apt_base) {
 		ec->apt_count++;
 
-		if (ec->apt_count >= JENT_APT_CUTOFF)
+		if (ec->apt_count >= ec->apt_cutoff)
 			ec->health_failure = 1;
 	}
 
 	ec->apt_observations++;
 
+	/*We just processed one complete window, so the next symbol input will be the new apt_base.*/
 	if (ec->apt_observations >= JENT_APT_WINDOW_SIZE)
-		jent_apt_reset(ec, current_delta);
+		jent_apt_reset(ec);
 }
 
 /***************************************************************************
@@ -190,18 +192,19 @@ static void jent_rct_insert(struct rand_data *ec, int stuck)
 		/*
 		 * The cutoff value is based on the following consideration:
 		 * alpha = 2^-30 as recommended in FIPS 140-2 IG 9.8.
-		 * In addition, we require an entropy value H of 1/OSR as this
+		 * In addition, we require an entropy value H of 1/osr as this
 		 * is the minimum entropy required to provide full entropy.
-		 * Note, we collect 64 * OSR deltas for inserting them into
-		 * the entropy pool which should then have (close to) 64 bits
-		 * of entropy.
+		 * Note, we collect (DATA_SIZE_BITS + ENTROPY_SAFETY_FACTOR)*osr deltas
+		 * for inserting them into the entropy pool which should then have
+		 * (close to) DATA_SIZE_BITS bits of entropy in the conditioned output.
 		 *
 		 * Note, ec->rct_count (which equals to value B in the pseudo
 		 * code of SP800-90B section 4.4.1) starts with zero. Hence
 		 * we need to subtract one from the cutoff value as calculated
-		 * following SP800-90B.
+		 * following SP800-90B. Thus C = ceil(-log_2(alpha)/H) = 30*osr.
+		 *
 		 */
-		if ((unsigned int)ec->rct_count >= (31 * ec->osr)) {
+		if ((unsigned int)ec->rct_count >= (30 * ec->osr)) {
 			ec->rct_count = -1;
 			ec->health_failure = 1;
 		}
@@ -1232,6 +1235,13 @@ struct rand_data *jent_entropy_collector_alloc(unsigned int osr,
 	if (osr < JENT_MIN_OSR)
 		osr = JENT_MIN_OSR;
 	entropy_collector->osr = osr;
+
+	/* Establish the apt_cutoff based on the presumed entropy rate of 1/osr. */
+	if(osr >= ARRAY_SIZE(jent_apt_cutoff_lookup)) {
+		entropy_collector->apt_cutoff = jent_apt_cutoff_lookup[ARRAY_SIZE(jent_apt_cutoff_lookup)-1];
+	} else {
+		entropy_collector->apt_cutoff = jent_apt_cutoff_lookup[osr-1];
+	}
 
 	if (jent_fips_enabled() || (flags & JENT_FORCE_FIPS))
 		entropy_collector->fips_enabled = 1;
