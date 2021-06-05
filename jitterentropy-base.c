@@ -107,6 +107,98 @@ unsigned int jent_version(void)
 }
 
 /***************************************************************************
+ * Lag Predictor Test
+ *
+ * This test is a vendor-defined conditional test that is designed to detect
+ * a known failure mode where the result becomes mostly deterministic
+ * Note that (lag_observations&JENT_LAG_MASK) is the index where the next value
+ * provided will be stored.
+ ***************************************************************************/
+
+/**
+ * Reset the lag counters
+ *
+ * @ec [in] Reference to entropy collector
+ */
+static void jent_lag_reset(struct rand_data *ec)
+{
+	/* Reset Lag counters */
+	ec->lag_prediction_success_count = 0;
+	ec->lag_prediction_success_run = 0;
+	ec->lag_best_predictor = 0; //The first guess is basically arbitrary.
+	ec->lag_observations = 0;
+	memset(ec->lag_scoreboard, 0, sizeof(ec->lag_scoreboard));
+	memset(ec->lag_delta_history, 0, sizeof(ec->lag_delta_history));
+}
+
+/**
+ * Insert a new entropy event into the lag predictor.
+ *
+ * @ec [in] Reference to entropy collector
+ * @current_delta [in] Current time delta
+ */
+static void jent_lag_insert(struct rand_data *ec, uint64_t current_delta)
+{
+	uint64_t prediction;
+	/* Initialize the delta_history*/
+	if (ec->lag_observations < JENT_LAG_HISTORY_SIZE) {
+		ec->lag_delta_history[ec->lag_observations] = current_delta;
+		ec->lag_observations++;
+		return;
+	}
+
+	/* The history is initialized. First make a guess and examine the results. */
+	prediction = ec->lag_delta_history[(ec->lag_observations - ec->lag_best_predictor - 1)&JENT_LAG_MASK];
+	if(prediction == current_delta) {
+		/* The prediction was correct. */
+		ec->lag_prediction_success_count++;
+		ec->lag_prediction_success_run++;
+		if((ec->lag_prediction_success_run >= ec->lag_local_cutoff) || (ec->lag_prediction_success_count >= ec->lag_global_cutoff))
+			ec->health_failure = 1;
+	} else {
+		/*The prediction wasn't correct. End any run of successes.*/
+		ec->lag_prediction_success_run=0;
+	}
+
+	/* Now update the predictors using the current data. */
+	for(unsigned int i=0; i < JENT_LAG_HISTORY_SIZE; i++) {
+		if(ec->lag_delta_history[(ec->lag_observations - i - 1)&JENT_LAG_MASK] == current_delta) {
+			/*The ith predictor (which guesses i+1 symbols in the past) successfully guessed.*/
+			ec->lag_scoreboard[i] ++;
+			//Keep track of the best predictor (tie goes to the shortest lag)
+			if(ec->lag_scoreboard[i] > ec->lag_scoreboard[ec->lag_best_predictor])
+				ec->lag_best_predictor = i;
+		}
+	}
+
+	/*Finally, update the lag_delta_history array with the newly input value.*/
+	ec->lag_delta_history[(ec->lag_observations) & JENT_LAG_MASK] = current_delta;
+	ec->lag_observations++;
+
+	/* lag_best_predictor now is the index of the predictor with the largest number of correct guesses.
+	 * This establishes our next guess.
+	 */
+
+	/* Do we now need a new window? */
+	if (ec->lag_observations >= JENT_LAG_WINDOW_SIZE)
+		jent_lag_reset(ec);
+}
+
+/**
+ * Return a prior delta value using the lag test's history.
+ *
+ * @ec [in] Reference to entropy collector
+ * @back [in] The number of elements back in history (0 is the prior element)
+ *
+ * @return
+ * 	The prior delta value (if there was a prior value) or 0 otherwise.
+ */
+static uint64_t jent_last_delta(struct rand_data *ec, unsigned int back)
+{
+	return ec->lag_delta_history[(ec->lag_observations - back - 1)&JENT_LAG_MASK];
+}
+
+/***************************************************************************
  * Adaptive Proportion Test
  *
  * This test complies with SP800-90B section 4.4.2.
@@ -251,17 +343,19 @@ static inline uint64_t jent_delta(uint64_t prev, uint64_t next)
  */
 static unsigned int jent_stuck(struct rand_data *ec, uint64_t current_delta)
 {
-	uint64_t delta2 = jent_delta(ec->last_delta, current_delta);
-	uint64_t delta3 = jent_delta(ec->last_delta2, delta2);
-
-	ec->last_delta = current_delta;
-	ec->last_delta2 = delta2;
+	/* Note that delta2_n = delta_n - delta_{n-1} */
+	uint64_t delta2 = jent_delta(jent_last_delta(ec, 0U), current_delta);
+	/* Note that delta3_n = delta2_n - delta2_{n-1}
+	 *                    = delta2_n - (delta_{n-1} - delta_{n-2})
+	 */
+	uint64_t delta3 = jent_delta(jent_delta(jent_last_delta(ec, 1U), jent_last_delta(ec, 0U)), delta2);
 
 	/*
 	 * Insert the result of the comparison of two back-to-back time
 	 * deltas.
 	 */
 	jent_apt_insert(ec, current_delta);
+	jent_lag_insert(ec, current_delta);
 
 	if (!current_delta || !delta2 || !delta3) {
 		/* RCT with a stuck bit */
@@ -1040,6 +1134,7 @@ static unsigned int jent_measure_jitter(struct rand_data *ec,
 	 */
 	jent_get_nstime_internal(ec, &time);
 	current_delta = jent_delta(ec->prev_time, time) / jent_common_timer_gcd;
+
 	ec->prev_time = time;
 
 	/* Check whether we have a stuck measurement. */
@@ -1241,6 +1336,14 @@ struct rand_data *jent_entropy_collector_alloc(unsigned int osr,
 		entropy_collector->apt_cutoff = jent_apt_cutoff_lookup[ARRAY_SIZE(jent_apt_cutoff_lookup)-1];
 	} else {
 		entropy_collector->apt_cutoff = jent_apt_cutoff_lookup[osr-1];
+
+	/* Establish the lag global and local cutoffs based on the presumed entropy rate of 1/osr. */
+	if(osr >= ARRAY_SIZE(jent_lag_global_cutoff_lookup)) {
+		entropy_collector->lag_global_cutoff = jent_lag_global_cutoff_lookup[ARRAY_SIZE(jent_lag_global_cutoff_lookup)-1];
+		entropy_collector->lag_local_cutoff = jent_lag_local_cutoff_lookup[ARRAY_SIZE(jent_lag_local_cutoff_lookup)-1];
+	} else {
+		entropy_collector->lag_global_cutoff = jent_lag_global_cutoff_lookup[osr-1];
+		entropy_collector->lag_local_cutoff = jent_lag_local_cutoff_lookup[osr-1];
 	}
 
 	if (jent_fips_enabled() || (flags & JENT_FORCE_FIPS))
