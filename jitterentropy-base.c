@@ -1426,10 +1426,21 @@ static int jent_time_entropy_init(unsigned int enable_notime)
 		goto out;
 	}
 
-	if (enable_notime) {
-		ec.enable_notime = 1;
-		jent_notime_settick(&ec);
+	/* Required by jent_measure_jitter */
+	jent_common_timer_gcd = 1;
+
+	/* Setup the memory space for jent_memaccess.
+	 * Absent this, the jent_memaccess step would do nothing, and we'd be left with
+	 * the variation within the hash processing only.
+	 */
+	ec.mem = (unsigned char *)jent_zalloc(JENT_MEMORY_SIZE);
+	if(ec.mem == NULL) {
+		ret = EMEM;
+		goto out;
 	}
+	ec.memblocksize = JENT_MEMORY_BLOCKSIZE;
+	ec.memblocks = JENT_MEMORY_BLOCKS;
+	ec.memaccessloops = JENT_MEMORY_ACCESSLOOPS;
 
 	/* Required for RCT. It is not clear what value should be chosen here. */
 	ec.osr = JENT_MIN_OSR;
@@ -1442,8 +1453,11 @@ static int jent_time_entropy_init(unsigned int enable_notime)
 	 */
 	ec.fips_enabled = 1;
 
-	/* Required by jent_measure_jitter */
-	jent_common_timer_gcd = 1;
+	/* Use the internal timer? */
+	if (enable_notime) {
+		ec.enable_notime = 1;
+		jent_notime_settick(&ec);
+	}
 
 	/* Setup the cutoff for the APT test. */
 	ec.apt_cutoff = jent_apt_cutoff_lookup[JENT_MIN_OSR - 1];
@@ -1550,7 +1564,7 @@ static int jent_time_entropy_init(unsigned int enable_notime)
 	/* Now look at the stored delta values in more detail (
 	 * without perturbing the main init loop timing). 
 	 */
-	/* First initilize the analysis state. */
+	/* First initialize the analysis state. */
 	if(delta_history[0] % 100 == 0) count_mod=1;
 	else count_mod=0;
 	running_gcd = delta_history[0];
@@ -1612,6 +1626,10 @@ out:
 	}
 	if (enable_notime) {
 		jent_notime_unsettick(&ec);
+	}
+
+	if(ec.mem != NULL) {
+		jent_zfree(ec.mem, JENT_MEMORY_SIZE);
 	}
 
 	return ret;
