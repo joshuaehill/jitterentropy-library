@@ -421,10 +421,10 @@ static struct rand_data
 	entropy_collector->mem = (volatile unsigned char *)jent_zalloc(memsize);
 
 	/* Make sure the PRNG has an initial seed before anything tries to use it. */
-	entropy_collector->prngState.u[0] = 0x8e93eec0697aaba7ULL;
-	entropy_collector->prngState.u[1] = 0xce65608a31b35a5eULL;
-	entropy_collector->prngState.u[2] = 0xa8d46b46cb642eeeULL;
-	entropy_collector->prngState.u[3] = 0xe83cef69c548c744ULL;
+	entropy_collector->prngState.u[0] = UINT64_C(0x8e93eec0697aaba7);
+	entropy_collector->prngState.u[1] = UINT64_C(0xce65608a31b35a5e);
+	entropy_collector->prngState.u[2] = UINT64_C(0xa8d46b46cb642eee);
+	entropy_collector->prngState.u[3] = UINT64_C(0xe83cef69c548c744);
 
 	/*
 	 * Transform the size into a mask - it is assumed that size is
