@@ -46,22 +46,22 @@
  * Any time you see a PRNG in a noise source, you should be concerned.
  *
  * This PRNG doesn’t directly produce the raw noise, or fundamentally
- * change the behavior of the underlying noise source. It is used in two
+ * change the behavior of the underlying noise source. It is used in three
  * places:
  * 1) It use used to select the memory address being updated. The timing of
  * the update is the source of  the raw sample. This helps make each
  * read/update independent of the prior ones by making the addresses
  * statistically independent of each other.
- * 2) It is used to establish the number of memory read cycles to do prior
- * to the one that is used as a source of memory read timing. This is
+ * 2) It is used to establish the number of memory read / hash cycles to do
+ * prior to the one that is used as a source of memory read timing. This is
  * intended to help provide independence between used adjacent timings.
- * 3) It is used as a source of data for the hash loop. This data
- * is not required to be difficult for an attacker to guess, and
+ * 3) It is used as a source of data for the hash loop. This use is
+ * essentially a nonce.
+ * This data is not required to be difficult for an attacker to guess, an
  * the output of this hash loop is not expected to contain any entropy.
  * The timing of this hash loop is used as an additional noise source,
  * which may contribute to the security of the system, but which is
- * assessed as providing no additional entropy. This use is essentially a
- * nonce.
+ * assessed as providing no additional entropy.
  *
  * In summary, the output of this PRNG is used because it has excellent
  * statistical properties, but is never relied on for entropy production,
@@ -119,12 +119,10 @@ static uint64_t jent_loop_shuffle(struct rand_data *ec, unsigned int bits, unsig
  * CPU Jitter noise source -- this is the noise source based on the CPU
  * 			      execution time jitter
  *
- * This function injects the individual bits of the time value into the
- * entropy pool using a hash.
+ * This function injects the time value into the conditioning function.
  *
  * @ec [in] entropy collector struct
  * @time [in] time delta to be injected
- * @stuck [in] Is the time delta identified as stuck?
  *
  * Output:
  * updated hash context
@@ -237,8 +235,8 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time)
  * @ec [in] Reference to the entropy collector with the memory access data -- if
  *	    the reference to the memory block to be accessed is NULL, this noise
  *	    source is disabled
- * @loop_cnt [in] if a value not equal to 0 is set, use the given value as
- *		  number of loops to perform the hash operation
+ *
+ * @return The number of cycles the memory update took.
  */
 static uint64_t jent_memaccess(struct rand_data *ec)
 {
@@ -279,7 +277,7 @@ static uint64_t jent_memaccess(struct rand_data *ec)
 /**
  * This is the heart of the entropy generation: calculate time deltas and
  * use the CPU jitter in the time deltas. The jitter is injected into the
- * entropy pool.
+ * conditioning function.
  *
  * WARNING: ensure that ->prev_time is primed before using the output
  * 	    of this function! This can be done by calling this function
@@ -309,7 +307,7 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 		/*
 		 * Always include all the data, irrespective of its underlying distribution.
 		 * In the instance where the data is not the desired distribution, then then
-		 * data is considered suplemental information.
+		 * data is considered supplemental information.
 		 * Call the additional noise sources which also runs the conditioning algorithm.
 		 */
 		jent_hash_time(ec, current_delta);

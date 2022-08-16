@@ -375,7 +375,7 @@ static void jent_rct_insert(struct rand_data *ec, int stuck)
 		 * In addition, we require an entropy value H of 1/osr as this
 		 * is the minimum entropy required to provide full entropy.
 		 * Note, we collect (DATA_SIZE_BITS + ENTROPY_SAFETY_FACTOR)*osr
-		 * deltas for inserting them into the entropy pool which should
+		 * deltas for inserting them into the conditioning function which should
 		 * then have (close to) DATA_SIZE_BITS bits of entropy in the
 		 * conditioned output.
 		 *

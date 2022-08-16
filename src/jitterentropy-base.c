@@ -167,6 +167,7 @@ static inline unsigned int jent_update_memsize(unsigned int flags)
  *	-3	APT test failed
  *	-4	The timer cannot be initialized
  *	-5	LAG failure
+ *	-6	Distribution proportion failure
  */
 JENT_PRIVATE_STATIC
 ssize_t jent_read_entropy(struct rand_data *ec, char *data, size_t len)
@@ -188,12 +189,15 @@ ssize_t jent_read_entropy(struct rand_data *ec, char *data, size_t len)
 		jent_random_data(ec);
 
 		if ((health_test_result = jent_health_failure(ec))) {
-			if (health_test_result & JENT_RCT_FAILURE)
+			if (health_test_result & JENT_RCT_FAILURE) {
 				ret = -2;
-			else if (health_test_result & JENT_APT_FAILURE)
+			} else if (health_test_result & JENT_APT_FAILURE) {
 				ret = -3;
-			else
+			} else if (health_test_result & JENT_LAG_FAILURE) {
 				ret = -5;
+			} else {
+				ret = -6;
+			}
 
 			goto err;
 		}
@@ -289,6 +293,7 @@ ssize_t jent_read_entropy_safe(struct rand_data **ec, char *data, size_t len)
 		case -2:
 		case -3:
 		case -5:
+		case -6:
 			osr = (*ec)->osr + 1;
 			flags = (*ec)->flags;
 			max_mem_set = (*ec)->max_mem_set;
@@ -479,7 +484,7 @@ static struct rand_data
 			goto err;
 	}
 
-	/* Initilize the PRNG seed. */
+	/* Initialize the PRNG seed. */
 	jent_random_data(entropy_collector);
 
 	if (jent_health_failure(entropy_collector)) {
