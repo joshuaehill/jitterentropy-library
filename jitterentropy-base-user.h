@@ -104,9 +104,54 @@ static inline void jent_get_nstime(volatile uint64_t *out)
 	_mm_lfence();
 }
 
-#else /* (__x86_64__) || (__i386__) */
+#elif defined(__aarch64__)
 
-static inline void jent_get_nstime(uint64_t *out)
+static inline void jent_get_nstime(volatile uint64_t *out)
+{
+        uint64_t ctr_val;
+        /*
+         * Use the system counter for aarch64 (64 bit ARM).
+         */
+        asm volatile("mrs %0, cntvct_el0" : "=r" (ctr_val));
+        *out = ctr_val;
+}
+
+#elif defined(__s390x__)
+
+static inline void jent_get_nstime(volatile uint64_t *out)
+{
+	uint64_t clk;
+
+	/* this is MVS code! enable with -S in the compiler */
+	/*__asm__ volatile("stck %0" : "=m" (clk) : : "cc"); */
+	/* this is gcc */
+	asm volatile("stcke %0" : "=Q" (clk) : : "cc");
+	*out = (uint64_t)(clk);
+}
+
+#elif defined(__powerpc)
+
+/* taken from http://www.ecrypt.eu.org/ebats/cpucycles.html */
+
+static inline void jent_get_nstime(volatile uint64_t *out)
+{
+	unsigned long high;
+	unsigned long low;
+	unsigned long newhigh;
+	uint64_t result;
+        asm volatile(
+		"Lcpucycles:mftbu %0;mftb %1;mftbu %2;cmpw %0,%2;bne Lcpucycles"
+		: "=r" (high), "=r" (low), "=r" (newhigh)
+		);
+	result = high;
+	result <<= 32;
+	result |= low;
+	*out = result;
+}
+
+#else /* (__x86_64__) || (__i386__) || (__aarch64__) || (__s390x__) || (__powerpc) */
+
+static inline void jent_get_nstime(volatile uint64_t *out)
 {
 	/* OSX does not have clock_gettime -- taken from
 	 * http://developer.apple.com/library/mac/qa/qa1398/_index.html */
@@ -139,7 +184,7 @@ static inline void jent_get_nstime(uint64_t *out)
 # endif /* __MACH__ */
 }
 
-#endif /* __x86_64__ */
+#endif /* (__x86_64__) || (__i386__) || (__aarch64__) */
 
 static inline void *jent_zalloc(size_t len)
 {

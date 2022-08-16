@@ -94,6 +94,7 @@ static inline uint64_t xoshiro256starstar(uint64_t *s)
  * Update of the loop count used for the next round of
  * an entropy collection.
  *
+ * @ec [in] entropy collector struct
  * @bits [in] is the number of low bits of the timer to consider
  * @min [in] is the number of bits we shift the timer value to the right at
  *	     the end to make sure we have a guaranteed minimum value
@@ -121,7 +122,7 @@ static uint64_t jent_loop_shuffle(struct rand_data *ec, unsigned int bits, unsig
  * This function injects the individual bits of the time value into the
  * entropy pool using a hash.
  *
- * @ec [in] entropy collector struct -- may be NULL
+ * @ec [in] entropy collector struct
  * @time [in] time delta to be injected
  * @stuck [in] Is the time delta identified as stuck?
  *
@@ -215,8 +216,29 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time)
 	sha3_update(ec->hash_state, (uint8_t *)&time, sizeof(time));
 }
 
-/*
- * The memory access source.
+/**
+ * Memory Access noise source -- this is a noise source based on variations in
+ * 				 memory access times
+ *
+ * This function performs memory accesses which will add to the timing
+ * variations due to an unknown amount of CPU wait states that need to be
+ * added when accessing memory. The memory size should be larger than the L1
+ * caches as outlined in the documentation and the associated testing.
+ *
+ * The L1 cache has a very high bandwidth, albeit its access rate is  usually
+ * slower than accessing CPU registers. Therefore, L1 accesses only add minimal
+ * variations as the CPU has hardly to wait. Starting with L2, significant
+ * variations are added because L2 typically does not belong to the CPU any more
+ * and therefore a wider range of CPU wait states is necessary for accesses.
+ * L3 and real memory accesses have even a wider range of wait states. However,
+ * to reliably access either L3 or memory, the ec->mem memory must be quite
+ * large which is usually not desirable.
+ *
+ * @ec [in] Reference to the entropy collector with the memory access data -- if
+ *	    the reference to the memory block to be accessed is NULL, this noise
+ *	    source is disabled
+ * @loop_cnt [in] if a value not equal to 0 is set, use the given value as
+ *		  number of loops to perform the hash operation
  */
 static uint64_t jent_memaccess(struct rand_data *ec)
 {
