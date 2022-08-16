@@ -88,12 +88,6 @@ extern "C" {
  */
 #define JENT_HEALTH_LAG_PREDICTOR
 
-/*
- * Shall the jent_memaccess use a (statistically) random selection for the
- * memory to update?
- */
-#define JENT_RANDOM_MEMACCESS
-
 /***************************************************************************
  * Jitter RNG State Definition Section
  ***************************************************************************/
@@ -166,6 +160,14 @@ struct jent_notime_thread {
 	void (*jent_notime_stop)(void *ctx);
 };
 
+#ifndef JENT_DISTRIBUTION_MIN
+#define JENT_DISTRIBUTION_MIN 0U
+#endif
+
+#ifndef JENT_DISTRIBUTION_MAX
+#define JENT_DISTRIBUTION_MAX UINT64_C(0xFFFFFFFFFFFFFFFF)
+#endif
+
 /* The entropy pool */
 struct rand_data
 {
@@ -185,38 +187,31 @@ struct rand_data
 	unsigned int flags;		/* Flags used to initialize */
 	unsigned int osr;		/* Oversampling rate */
 
-#ifdef JENT_RANDOM_MEMACCESS
-  /* The step size should be larger than the cacheline size. */
-# ifndef JENT_MEMORY_BITS
-#  define JENT_MEMORY_BITS 17
-# endif
-# ifndef JENT_MEMORY_SIZE
-#  define JENT_MEMORY_SIZE (UINT32_C(1)<<JENT_MEMORY_BITS)
-# endif
-#else /* JENT_RANDOM_MEMACCESS */
-# ifndef JENT_MEMORY_BLOCKS
-#  define JENT_MEMORY_BLOCKS 512
-# endif
-# ifndef JENT_MEMORY_BLOCKSIZE
-#  define JENT_MEMORY_BLOCKSIZE 128
-# endif
-# ifndef JENT_MEMORY_SIZE
-#  define JENT_MEMORY_SIZE (JENT_MEMORY_BLOCKS*JENT_MEMORY_BLOCKSIZE)
-# endif
-#endif /* JENT_RANDOM_MEMACCESS */
-
-#define JENT_MEMORY_ACCESSLOOPS 128
-	unsigned char *mem;		/* Memory access location with size of
-					 * JENT_MEMORY_SIZE or memsize */
-#ifdef JENT_RANDOM_MEMACCESS
-	uint32_t memmask;		/* Memory mask (size of memory - 1) */
-#else
-	unsigned int memlocation; 	/* Pointer to byte in *mem */
-	unsigned int memblocks;		/* Number of memory blocks in *mem */
-	unsigned int memblocksize; 	/* Size of one memory block in bytes */
+#ifdef JENT_MEMORY_BITS
+# define JENT_MEMORY_SIZE (UINT32_C(1)<<JENT_MEMORY_BITS)
 #endif
-	unsigned int memaccessloops;	/* Number of memory accesses per random
+
+#ifndef JENT_MEMORY_SIZE
+# define JENT_MEMORY_SIZE 0
+#endif
+
+#ifndef JENT_MEMORY_DEPTH_BITS
+#define JENT_MEMORY_DEPTH_BITS 0
+#endif
+
+#define JENT_HASHLOOPS 1
+	volatile unsigned char *mem;	/* Memory access location with size of
+					 * JENT_MEMORY_SIZE or memsize */
+	uint32_t memmask;		/* Memory mask (size of memory - 1) */
+        union {
+                uint64_t u[4];
+                uint8_t b[sizeof(uint64_t) * 4];
+        } prngState;
+	unsigned int hashloops;		/* Number of hash invocations per random
 					 * bit generation */
+
+	uint64_t data_count;		/* The total number of timing values that have been observed. */
+	uint64_t in_dist_count;		/*The total number of timing values within the expected distribution.*/
 
 	/* Repetition Count Test */
 	int rct_count;			/* Number of stuck values */
@@ -304,9 +299,7 @@ struct rand_data
 /* Flags that can be used to initialize the RNG */
 #define JENT_DISABLE_STIR (1<<0) 	/* UNUSED */
 #define JENT_DISABLE_UNBIAS (1<<1) 	/* UNUSED */
-#define JENT_DISABLE_MEMORY_ACCESS (1<<2) /* Disable memory access for more
-					     entropy, saves MEMORY_SIZE RAM for
-					     entropy collector */
+#define JENT_DISABLE_MEMORY_ACCESS (1<<2) /* UNUSED */
 #define JENT_FORCE_INTERNAL_TIMER (1<<3)  /* Force the use of the internal
 					     timer */
 #define JENT_DISABLE_INTERNAL_TIMER (1<<4)  /* Disable the potential use of
@@ -357,6 +350,18 @@ struct rand_data
  * It is allowed to change this value as required for the intended environment.
  */
 #define JENT_STUCK_INIT_THRES(x) ((x*9) / 10)
+#endif
+
+#ifndef JENT_DIST_RUNNING_THRES
+/*
+ * By default, at least 10% of all measurements
+ * are expected to be in the expected distribution.
+ * This is structured to round down (until there are at least 1000
+ * observations, the cutoff is rounded down to 0).
+ *
+ * It is allowed to change this value as required for the intended environment.
+ */
+#define JENT_DIST_RUNNING_THRES(x) (((x) / 1000)*100)
 #endif
 
 #ifdef JENT_PRIVATE_COMPILE
@@ -453,6 +458,7 @@ static inline void jent_notime_fini(void *ctx) { (void)ctx; }
 #define JENT_RCT_FAILURE	1 /* Failure in RCT health test. */
 #define JENT_APT_FAILURE	2 /* Failure in APT health test. */
 #define JENT_LAG_FAILURE	4 /* Failure in Lag predictor health test. */
+#define JENT_DIST_FAILURE	8 /* Failure in distribution proportion health test. */
 /* -- END error masks for health tests -- */
 
 /* -- BEGIN statistical test functions only complied with CONFIG_CRYPTO_CPU_JITTERENTROPY_STAT -- */

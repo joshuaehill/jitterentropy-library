@@ -93,23 +93,15 @@
 #endif
 
 #if (__x86_64__) || (__i386__)
+
 /* Support rdtsc read on 64-bit and 32-bit x86 architectures */
+#include <x86intrin.h>
 
-#ifdef __x86_64__
-# define DECLARE_ARGS(val, low, high)    unsigned long low, high
-# define EAX_EDX_VAL(val, low, high)     ((low) | (high) << 32)
-# define EAX_EDX_RET(val, low, high)     "=a" (low), "=d" (high)
-#elif __i386__
-# define DECLARE_ARGS(val, low, high)    unsigned long val
-# define EAX_EDX_VAL(val, low, high)     val
-# define EAX_EDX_RET(val, low, high)     "=A" (val)
-#endif
-
-static inline void jent_get_nstime(uint64_t *out)
+static inline void jent_get_nstime(volatile uint64_t *out)
 {
-	DECLARE_ARGS(val, low, high);
-	asm volatile("rdtsc" : EAX_EDX_RET(val, low, high));
-	*out = EAX_EDX_VAL(val, low, high);
+	unsigned int dummy;
+	*out =  __rdtscp(&dummy);
+	_mm_lfence();
 }
 
 #else /* (__x86_64__) || (__i386__) */

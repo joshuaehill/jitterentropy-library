@@ -420,6 +420,13 @@ unsigned int jent_stuck(struct rand_data *ec, uint64_t current_delta)
 	jent_apt_insert(ec, current_delta);
 	jent_lag_insert(ec, current_delta);
 
+	/*
+	 * If the proportion of observed values is outside the sought distribution
+	 * too often, trigger a health test failure.
+	 */
+	if(JENT_DIST_RUNNING_THRES(ec->data_count) > ec->in_dist_count)
+		ec->health_failure |= JENT_DIST_FAILURE;
+
 	if (!current_delta || !delta2 || !delta3) {
 		/* RCT with a stuck bit */
 		jent_rct_insert(ec, 1);
@@ -452,6 +459,7 @@ unsigned int jent_health_failure(struct rand_data *ec)
 	if (fips_cb && ec->health_failure) {
 		fips_cb(ec, ec->health_failure);
 	}
+
 
 	return ec->health_failure;
 }

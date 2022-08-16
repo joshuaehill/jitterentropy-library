@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <math.h>
+#include <assert.h>
 
 #include "jitterentropy-sha3.c"
 #include "jitterentropy-gcd.c"
@@ -43,33 +45,30 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 			 unsigned int flags, int report_counter_ticks)
 {
 	unsigned long size = 0;
-	struct rand_data *ec = NULL, *ec_min = NULL;
-	FILE *out = NULL;
-	uint64_t *duration, *duration_min;
+	struct rand_data *ec = NULL;
+	FILE *out_file = NULL;
+	uint8_t *duration;
 	int ret = 0;
 	unsigned int health_test_result;
 
-	duration = calloc(rounds, sizeof(uint64_t));
+	assert((JENT_DISTRIBUTION_MAX - JENT_DISTRIBUTION_MIN) <= 255);
+
+	//duration = calloc(rounds, sizeof(uint64_t));
+	duration = calloc(rounds, sizeof(uint8_t));
 	if (!duration)
 		return 1;
 
-	duration_min = calloc(rounds, sizeof(uint64_t));
-	if (!duration_min) {
-		free(duration);
-		return 1;
-	}
+	fprintf(stderr, "Processing %s\n", pathname);
 
-	printf("Processing %s\n", pathname);
-
-	out = fopen(pathname, "w");
-	if (!out) {
+	out_file = fopen(pathname, "w");
+	if (!out_file) {
 		ret = 1;
 		goto out;
 	}
 
 	ret = jent_entropy_init();
 	if (ret) {
-		printf("The initialization failed with error code %d\n", ret);
+		fprintf(stderr, "The initialization failed with error code %d\n", ret);
 		goto out;
 	}
 	ec = jent_entropy_collector_alloc(0, flags);
@@ -78,11 +77,8 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		goto out;
 	}
 
-	ec_min = jent_entropy_collector_alloc(0, flags);
-	if (!ec_min) {
-		ret = 1;
-		goto out;
-	}
+	fprintf(stderr, "Bytes of memory: 2^%g\n", log2(ec->memmask+1U));
+	fprintf(stderr, "Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_BITS);
 
 	if (!report_counter_ticks) {
 		/*
@@ -90,66 +86,55 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		 * have had common factors removed.
 		 */
 		ec->jent_common_timer_gcd = 1;
-		ec_min->jent_common_timer_gcd = 1;
 	}
 
 	if (ec->enable_notime) {
 		jent_notime_settick(ec);
-		jent_notime_settick(ec_min);
 	}
 
 	/* Enable full SP800-90B health test handling */
 	ec->fips_enabled = 1;
-	ec_min->fips_enabled = 1;
 
 	/* Prime the test */
-	jent_measure_jitter(ec, 0, NULL);
+	jent_measure_jitter(ec, NULL);
 	for (size = 0; size < rounds; size++) {
 		/* Disregard stuck indicator */
-		jent_measure_jitter(ec, 0, &duration[size]);
+		uint64_t rawdata;
+		jent_measure_jitter(ec, &rawdata);
+		assert(rawdata >= JENT_DISTRIBUTION_MIN);
+		duration[size] = (uint8_t)(rawdata - JENT_DISTRIBUTION_MIN);
 	}
 
-	jent_measure_jitter(ec_min, 0, NULL);
-	for (size = 0; size < rounds; size++) {
-		/* Disregard stuck indicator */
-		jent_measure_jitter(ec_min, 1, &duration_min[size]);
-	}
-
+	#if 0
 	for (size = 0; size < rounds; size++)
-		fprintf(out, "%" PRIu64 " %" PRIu64 "\n", duration[size], duration_min[size]);
+		fprintf(out_file, "%" PRIu64 "\n", duration[size]);
+	#endif
+
+	if(fwrite(duration, sizeof(uint8_t), rounds, out_file) != rounds) {
+		ret = 1;
+		goto out;
+	}
 
 	if ((health_test_result = jent_health_failure(ec))) {
-		printf("The main context encountered the following health testing failure(s):");
+		printf("The jent context encountered the following health testing failure(s):");
 		if (health_test_result & JENT_RCT_FAILURE) printf(" RCT");
 		if (health_test_result & JENT_APT_FAILURE) printf(" APT");
 		if (health_test_result & JENT_LAG_FAILURE) printf(" Lag");
-		printf("\n");
-	}
-
-	if ((health_test_result = jent_health_failure(ec_min))) {
-		printf("The minimum context encountered the following health testing failure(s):");
-		if (health_test_result & JENT_RCT_FAILURE) printf(" RCT");
-		if (health_test_result & JENT_APT_FAILURE) printf(" APT");
-		if (health_test_result & JENT_LAG_FAILURE) printf(" Lag");
+		if (health_test_result & JENT_DIST_FAILURE) printf(" Dist");
 		printf("\n");
 	}
 
 out:
 	free(duration);
-	free(duration_min);
 	if (flags & JENT_FORCE_INTERNAL_TIMER) {
 		if (ec)
 			jent_notime_unsettick(ec);
-		if (ec_min)
-			jent_notime_unsettick(ec_min);
 	}
-	if (out)
-		fclose(out);
+	if (out_file)
+		fclose(out_file);
 
 	if (ec)
 		jent_entropy_collector_free(ec);
-	if (ec_min)
-		jent_entropy_collector_free(ec_min);
 
 	return ret;
 }

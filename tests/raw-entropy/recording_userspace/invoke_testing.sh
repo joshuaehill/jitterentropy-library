@@ -4,7 +4,8 @@
 OUTDIR="../results-measurements"
 
 # Maximum number of entries to be extracted from the original file
-NUM_EVENTS=1000000
+NUM_EVENTS=${sampleSize:-1000000}
+NUM_ROUNDS=${sampleRounds:-1}
 
 # Number of restart tests
 NUM_EVENTS_RESTART=1000
@@ -75,7 +76,7 @@ raw_entropy()
 
 	make -s -f Makefile.hashtime
 
-	./jitterentropy-hashtime $NUM_EVENTS 1 $OUTDIR/$NONIID_DATA $MAX_MEMORY_SIZE $FORCE_NOTIME_NOISE_SOURCE
+	./jitterentropy-hashtime $NUM_EVENTS $NUM_ROUNDS $OUTDIR/$NONIID_DATA $MAX_MEMORY_SIZE $FORCE_NOTIME_NOISE_SOURCE
 
 	make -s -f Makefile.hashtime clean
 }
@@ -83,4 +84,4 @@ raw_entropy()
 initialization
 #lfsroutput
 raw_entropy
-raw_entropy_restart
+#raw_entropy_restart

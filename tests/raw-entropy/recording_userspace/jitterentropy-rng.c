@@ -45,8 +45,6 @@ int main(int argc, char * argv[])
 	while (argc > 1) {
 		if (!strncmp(argv[1], "--force-fips", 12))
 			flags |= JENT_FORCE_FIPS;
-		else if (!strncmp(argv[1], "--disable-memory-access", 23))
-			flags |= JENT_DISABLE_MEMORY_ACCESS;
 		else if (!strncmp(argv[1], "--disable-internal-timer", 24))
 			flags |= JENT_DISABLE_INTERNAL_TIMER;
 		else if (!strncmp(argv[1], "--force-internal-timer", 22))

@@ -1,10 +1,12 @@
 # Compile Noise Source as user space application
 
-CC ?= gcc
+CC = clang-14
 CFLAGS +=-Wextra -Wall -pedantic -fPIC -O0
 #Hardening
 CFLAGS +=-fwrapv --param ssp-buffer-size=4 -fvisibility=hidden -fPIE -Wcast-align -Wmissing-field-initializers -Wshadow -Wswitch-enum
-LDFLAGS +=-Wl,-z,relro,-z,now
+#CFLAGS += -g -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls
+LDFLAGS +=-Wl,-z,relro,-z,now -lm
+#LDFLAGS +=--fsanitize=address
 
 GCCVERSIONFORMAT := $(shell echo `$(CC) -dumpversion | sed 's/\./\n/g' | wc -l`)
 ifeq "$(GCCVERSIONFORMAT)" "3"
