@@ -37,6 +37,61 @@ int jent_set_fips_failure_callback_internal(jent_fips_failure_cb cb)
 	return 0;
 }
 
+void jent_dist_init(struct rand_data *ec)
+{
+	ec->current_data_count = 0;
+	ec->current_in_dist_count = 0;
+	ec->data_count_history = 0;
+	ec->in_dist_count_history = 0;
+}
+
+/**
+ * Reset the dist counters
+ *
+ * @ec [in] Reference to entropy collector
+ */
+static void jent_dist_reset(struct rand_data *ec)
+{
+	ec->in_dist_count_history += ec->current_in_dist_count;
+	ec->current_in_dist_count = 0;
+
+	ec->data_count_history += ec->current_data_count;
+	ec->current_data_count = 0;
+}
+
+/**
+ * The current result of the dist test
+ *
+ * @ec [in] Reference to entropy collector
+ */
+void jent_dist_test(struct rand_data *ec)
+{
+	/*
+	 * If the proportion of observed values is outside the sought distribution
+	 * too often, trigger a health test failure.
+	 */
+	if(ec->current_data_count >= JENT_DIST_WINDOW) {
+		if(JENT_DIST_RUNNING_THRES(ec->current_data_count) > ec->current_in_dist_count)
+			ec->health_failure |= JENT_DIST_FAILURE;
+
+		jent_dist_reset(ec);
+	}
+}
+
+/**
+ * Insert a new entropy event into the dist test
+ *
+ * @ec [in] Reference to entropy collector
+ * @current_delta [in] Current time delta
+ */
+void jent_dist_insert(struct rand_data *ec, uint64_t current_delta)
+{
+	ec->current_data_count++;
+	/* Is this in the reference distribution? */
+	if((ec->jent_common_timer_gcd == 0) || ((current_delta >= JENT_DISTRIBUTION_MIN) && (current_delta <= JENT_DISTRIBUTION_MAX)))
+		ec->current_in_dist_count++;
+}
+
 /***************************************************************************
  * Lag Predictor Test
  *
@@ -419,13 +474,7 @@ unsigned int jent_stuck(struct rand_data *ec, uint64_t current_delta)
 	 */
 	jent_apt_insert(ec, current_delta);
 	jent_lag_insert(ec, current_delta);
-
-	/*
-	 * If the proportion of observed values is outside the sought distribution
-	 * too often, trigger a health test failure.
-	 */
-	if(JENT_DIST_RUNNING_THRES(ec->data_count) > ec->in_dist_count)
-		ec->health_failure |= JENT_DIST_FAILURE;
+	jent_dist_test(ec);
 
 	if (!current_delta || !delta2 || !delta3) {
 		/* RCT with a stuck bit */

@@ -446,10 +446,6 @@ static struct rand_data
 	/* Initialize the hash state */
 	sha3_256_init(entropy_collector->hash_state);
 
-	/* Initialize the data counts. */
-	entropy_collector->data_count = 0;
-        entropy_collector->in_dist_count = 0;
-
 	/* verify and set the oversampling rate */
 	if (osr < JENT_MIN_OSR)
 		osr = JENT_MIN_OSR;
@@ -458,6 +454,9 @@ static struct rand_data
 
 	if ((flags & JENT_FORCE_FIPS) || jent_fips_enabled())
 		entropy_collector->fips_enabled = 1;
+
+	/* Initialize the distribution data counts. */
+	jent_dist_init(entropy_collector);
 
 	/* Initialize the APT */
 	jent_apt_init(entropy_collector, osr);

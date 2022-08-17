@@ -38,6 +38,17 @@
 #define REPORT_COUNTER_TICKS 1
 #endif
 
+#if (JENT_DISTRIBUTION_MAX - JENT_DISTRIBUTION_MIN) <= UINT8_MAX
+	#define DATATYPE uint8_t
+	#define DATAEXT "-sd.bin"
+#elif (JENT_DISTRIBUTION_MAX - JENT_DISTRIBUTION_MIN) <= UINT32_MAX
+	#define DATATYPE uint32_t
+	#define DATAEXT "-u32.bin"
+#else
+	#define DATATYPE uint64_t
+	#define DATAEXT "-u64.bin"
+#endif
+
 /***************************************************************************
  * Statistical test logic not compiled for regular operation
  ***************************************************************************/
@@ -47,14 +58,11 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 	unsigned long size = 0;
 	struct rand_data *ec = NULL;
 	FILE *out_file = NULL;
-	uint8_t *duration;
+	DATATYPE *duration;
 	int ret = 0;
 	unsigned int health_test_result;
 
-	assert((JENT_DISTRIBUTION_MAX - JENT_DISTRIBUTION_MIN) <= 255);
-
-	//duration = calloc(rounds, sizeof(uint64_t));
-	duration = calloc(rounds, sizeof(uint8_t));
+	duration = calloc(rounds, sizeof(DATATYPE));
 	if (!duration)
 		return 1;
 
@@ -102,15 +110,10 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		uint64_t rawdata;
 		jent_measure_jitter(ec, &rawdata);
 		assert(rawdata >= JENT_DISTRIBUTION_MIN);
-		duration[size] = (uint8_t)(rawdata - JENT_DISTRIBUTION_MIN);
+		duration[size] = (DATATYPE)(rawdata - JENT_DISTRIBUTION_MIN);
 	}
 
-	#if 0
-	for (size = 0; size < rounds; size++)
-		fprintf(out_file, "%" PRIu64 "\n", duration[size]);
-	#endif
-
-	if(fwrite(duration, sizeof(uint8_t), rounds, out_file) != rounds) {
+	if(fwrite(duration, sizeof(DATATYPE), rounds, out_file) != rounds) {
 		ret = 1;
 		goto out;
 	}
@@ -123,6 +126,8 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		if (health_test_result & JENT_DIST_FAILURE) printf(" Dist");
 		printf("\n");
 	}
+
+	printf("%zu / %zu (%g %%) samples in reference distribution\n", ec->in_dist_count_history, ec->data_count_history, 100.0 * (double)ec->in_dist_count_history/((double)ec->data_count_history));
 
 out:
 	free(duration);
@@ -230,8 +235,7 @@ int main(int argc, char * argv[])
 		flags |= JENT_FORCE_INTERNAL_TIMER;
 
 	for (i = 1; i <= repeats; i++) {
-		snprintf(pathname, sizeof(pathname), "%s-%.4lu.data", argv[3],
-			 i);
+		snprintf(pathname, sizeof(pathname), "%s-%.4lu%s", argv[3], i, DATAEXT);
 
 		ret = jent_one_test(pathname, rounds, flags,
 				    REPORT_COUNTER_TICKS);

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+cutoff=$(~/random/Theseus-20220628/bin/percentile 0.99 results-measurements-random_memaccess-30bits/jent-raw-noise-0001.data)
+echo "Cutoff: $cutoff"
+
+for dir in results-measurements-random_memaccess-*; do 
+	echo $dir
+	~/random/Theseus-20220628/bin/percentile 0.9999 ${dir}/jent-raw-noise-0001.data
+	cat ${dir}/jent-raw-noise-0001.data | ./cutoffAbove ${cutoff} | ~/.local/bin/hist
+done

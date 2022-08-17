@@ -297,12 +297,11 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 	uint64_t observed_symbol_target;
 
 	separation = jent_loop_shuffle(ec, JENT_MEMORY_DEPTH_BITS, JENT_MEMORY_DEPTH_BITS);
-	observed_symbol_target = ec->in_dist_count + separation;
+	observed_symbol_target = ec->current_in_dist_count + separation;
 
 	do {
 		/* Invoke the primary noise source (the memory access noise source)*/
 		current_delta = jent_memaccess(ec);
-		ec->data_count++;
 
 		/*
 		 * Always include all the data, irrespective of its underlying distribution.
@@ -312,11 +311,9 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 		 */
 		jent_hash_time(ec, current_delta);
 
-		/* Is this in the reference distribution? */
-		if((current_delta >= JENT_DISTRIBUTION_MIN) && (current_delta <= JENT_DISTRIBUTION_MAX))
-			ec->in_dist_count++;
+		jent_dist_insert(ec, current_delta);
 
-	} while (ec->in_dist_count < observed_symbol_target);
+	} while (ec->current_in_dist_count < observed_symbol_target);
 
 	/*
 	 * This is in the identified distribution that we are looking for,

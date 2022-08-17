@@ -210,8 +210,11 @@ struct rand_data
 	unsigned int hashloops;		/* Number of hash invocations per random
 					 * bit generation */
 
-	uint64_t data_count;		/* The total number of timing values that have been observed. */
-	uint64_t in_dist_count;		/*The total number of timing values within the expected distribution.*/
+	#define JENT_DIST_WINDOW 10000U
+	uint64_t current_data_count;	/* The total number of timing values that have been observed. */
+	uint64_t current_in_dist_count;	/*The total number of timing values within the expected distribution.*/
+	uint64_t data_count_history;	/* The total number of timing values that have been observed. */
+	uint64_t in_dist_count_history;	/*The total number of timing values within the expected distribution.*/
 
 	/* Repetition Count Test */
 	int rct_count;			/* Number of stuck values */
@@ -358,10 +361,12 @@ struct rand_data
  * are expected to be in the expected distribution.
  * This is structured to round down (until there are at least 1000
  * observations, the cutoff is rounded down to 0).
+ * Under a binomial assumption, InverseCDF[Binomial[1000, 0.10], 2^-40] = 40,
+ * so we use that as our cutoff.
  *
  * It is allowed to change this value as required for the intended environment.
  */
-#define JENT_DIST_RUNNING_THRES(x) (((x) / 1000)*100)
+#define JENT_DIST_RUNNING_THRES(x) (((x) / 1000)*40)
 #endif
 
 #ifdef JENT_PRIVATE_COMPILE
