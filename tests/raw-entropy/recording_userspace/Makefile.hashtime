@@ -4,7 +4,6 @@ CC = clang-14
 CFLAGS +=-Wextra -Wall -pedantic -fPIC -O0
 #Hardening
 CFLAGS +=-fwrapv --param ssp-buffer-size=4 -fvisibility=hidden -fPIE -Wcast-align -Wmissing-field-initializers -Wshadow -Wswitch-enum
-CFLAGS +=-DJENT_MEMORY_DEPTH_BITS=8 -DJENT_MEMORY_BITS=28 -DJENT_DISTRIBUTION_MIN=100 -DJENT_DISTRIBUTION_MAX=355
 #CFLAGS += -g -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls
 LDFLAGS +=-Wl,-z,relro,-z,now -lm
 #LDFLAGS +=--fsanitize=address
