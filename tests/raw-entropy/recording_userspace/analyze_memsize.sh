@@ -12,8 +12,7 @@ export sampleSize=1000000
 export sampleRounds=2
 FILETYPE="u64.bin"
 
-#for bits in {10..30}
-for bits in {10..12}
+for bits in {10..30}
 do
 	export CFLAGS="-DJENT_MEMORY_BITS=$bits"
 

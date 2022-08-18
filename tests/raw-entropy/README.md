@@ -3,19 +3,10 @@
 This archive contains the SP800-90B analysis tool to be used for the Jitter RNG.
 The tool set consists of the following individual tools:
 
-- `recording_kernelspace`: This tool is used to gather the raw entropy of
-  the Linux kernel space Jitter RNG.
-
 - `recording_userspace`: This tools is used to gather the raw entropy of
   the user space Jitter RNG implementation.
 
-- `validation-runtime`: This tool is used to calculate the minimum entropy
-  values compliant to SP800-90B section 3.1.3.
-
-- `validation-restart`: This tool is used to calculate the minimum entropy
-  values for the restart test compliant to SP800-90B section 3.1.4
-
-See the README files in the different subdirectories.
+See the README files in the different sub directories.
 
 # Interpretation of Results
 
@@ -32,162 +23,79 @@ H_bitstring: 0.337104
 min(H_original, 8 X H_bitstring): 2.387470
 ```
 
-The last value gives you the entropy estimate per time delta. That means for one
-time delta the given number of entropy in bits is collected on average.
+The last value gives you an upper bound for the min entropy per time delta.
+That means for one time delta the given number of entropy in bits is
+expected to be less than this value on average.
 
-Per default, the Jitter RNG heuristic applies 1/3 bit of entropy per
-time delta. This implies that the measurement must show that *at least* 1/3 bit
+The Jitter RNG heuristic presumes 1/`osr` bit of entropy per
+time delta. This implies that the measurement must show that *at least* 1/`osr` bit
 of entropy is present. In the example above, the measurement shows that
-2.3 bits of entropy is present which implies that the available amount of
-entropy is more than what the Jitter RNG heuristic applies.
+as much as 2.3 bits of entropy is present which implies that the available amount of
+entropy may be more than what the Jitter RNG heuristic applies.
 
-## Restart Tests
+In more formal validation settings, it is necessary to separately estimate a
+heuristic lower bound for the entropy.
 
-The results of the restart tests obtained with `validation-restart` contains
-in the file `jent-raw-noise-restart-consolidated.minentropy_FF_8bits.var.txt`
-at the bottom data like the following:
+# Approach to Justify a Particular Heuristic Entropy Estimate
 
-```
-H_r: 0.545707
-H_c: 1.363697
-H_I: 0.333000
+In general, it is difficult to produce a stochastic model for non-physical noise
+sources that apply across different hardware. In this section, we present an
+approach for generating a technical (heuristic) argument for why this noise
+source can support a stated entropy rate on particular hardware.
 
-Validation Test Passed...
+One can characterize an IID noise source using only an adequately detailed histogram,
+as the min entropy of such a source established by the symbol probabilities viewed in
+isolation. For a non-IID noise source, this yields only an upper bound for the min
+entropy. This occurs because non-IID sources have statistical memory, that is there is
+internal state that induces relationships between the current output and some number of
+past outputs.  The statistical memory “depth” is the number of symbols that have a significant
+interrelationship.
 
-min(H_r, H_c, H_I): 0.333000
-```
+The approach here has essentially three steps.
+1. The distribution of timings is examined for a variety of memory settings
+(each setting is selected using the `JENT_MEMORY_BITS` define).
+For each memory setting, perform an initial review of the resulting symbol
+histograms. It is likely that using a larger memory region will significantly
+affect the observed distributions, as a larger memory region leads to more cache
+misses. This progression continues until the distribution becomes fairly fixed
+at a `terminal distribution`, whence additionally increasing the memory size has
+limited observable impact on the resulting histogram.
+On most architectures, it is useful to set the memory size to at least
+the smallest value that attains this `terminal distribution`.
+2. Select the sub-distribution of interest.  This should be a
+sub-distribution that is both common (ideally capturing over 80% of the
+observed values) and suitably broad to support a reasonable entropy level.
+This sub-distribution is provided using the `JENT_DISTRIBUTION_MIN` and
+`JENT_DISTRIBUTION_MAX` settings.
+3. Use the `analyze_depth.sh` tool to estimate the statistical memory depth of
+the system.  In order to determine what level of memory is associated with this system,
+the data is internally probabilistically decimated at a rate governed by the
+`JENT_MEMORY_DEPTH_BITS` parameter.  If a suitably large `JENT_MEMORY_DEPTH_BITS`
+setting results in the produced data set passing the NIST SP 800-90B Section 5 IID tests
+at a suitably high rate, then a histogram-based entropy estimate can be applied
+as the heuristic entropy estimate.
 
-The last value gives you the entropy estimate per time delta for the restart
-tests. That means for one time delta the given number of entropy in bits
-collected on average.
+A single test result from the NIST SP 800-90B tests is not meaningful for this
+testing, but it would be reasonable to instead test many
+data sets in this way. The result of such repeated testing can be viewed as “passing”
+so long as the proportion of tests passing for each IID test is larger than some fixed
+cutoff.
 
-Per default, the Jitter RNG heuristic applies 1/3 bit of entropy per
-time delta. This implies that the measurement must show that 1/3 bit
-of entropy is present. Unlike with the runtime tests, the restart tests
-results compares the data against the Jitter RNG's H_I value of 1/3 bits.
-Thus, the value must show 1/3 bits to show that sufficient entropy is
-provided. In the example above, the measurement shows that
-1/3 bits of entropy is present which implies that the available amount of
-entropy is more than what the Jitter RNG heuristic applies.
+In SP 800-90B, each IID test is designed to have a false reject rate of 1/1000. One can
+calculate the (one-sided) p-value for the number of observed test failures using the binomial
+distribution: if we denote the number of observed failures as k and the CDF of the failure
+count Binomial Distribution (with parameters p=1/1000, and  n being the number of 1 million
+sample non-overlapping data sets) as F(x), then we can calculate the p-value as 1-F(k-1).
 
-# Approach to Solve Insufficient Entropy
-
-The Jitter RNG does not need any specific configurations or settings. However,
-in case your entropy assessment shows that insufficient entropy is
-present (e.g. by showing that the measured entropy rate is less than 1/3), you
-can perform a search whether different memory access values gives better
-entropy.
-
-## Tool for Searching for More Entropy
-
-It is possible that the the default setting of the Jitter RNG does not deliver
-sufficient entropy. It is possible to adjust the memory access part of the
-Jitter RNG which may deliver more entropy.
-
-To support analysis of insufficient entropy, the following tools are provided.
-The goal of those test tools is to detect the proper memory setting that is
-appropriate for your environment. One memory setting consists of two values,
-one for the number of memory blocks and one for the memory block size.
-
-- `recording_userspace/analyze_options.sh`: This tool generates a large number
-  of different test results for different settings for the memory access. Simply
-  execute the tool without any options. A large set of different test results
-  directories are created.
-
-- `validation-runtime/analyze_options.sh`: This tool analyzes all test results
-  directories created by the `recording_userspace/analyze_options.sh` for
-  the runtime data. It generates an overview file with all test results in
-  `results-runtime-multi`. Analyze it and extract the memory access settings
-  that gives you the intended entropy rate.
-
-- `validation-restart/analyze_options.sh`: This tool analyzes all test results
-  directories created by the `recording_userspace/analyze_options.sh` for
-  the restart data. It generates an overview file with all test results in
-  `results-restart-multi`. Analyze it and extract the memory access settings
-  that gives you the intended entropy rate.
-
-After you concluded the testing you have 2 memory settings that should be
-appropriate for you. As you need exactly one memory setting, analyze again
-the results to detect the memory setting that gives suitable entropy rates
-for both, the runtime and restart tests.
-
-Once you found the suitable memory setting, compile the Jitter RNG library
-with the following defines:
-
-`CFLAGS="-DJENT_MEMORY_BLOCKS=<blocks> -DJENT_MEMORY_BLOCKSIZE=<blocksize>"`
-
-### Example
-
-For example, the test returns the following data
-
-```
-Number of bits  min entropy
-10       0.406505
-11       0.445082
-12       0.402972
-13       0.459021
-14       0.436911
-15       0.578995
-16       0.643272
-17       0.573532
-18       0.627915
-19       0.503923
-20       0.720609
-21       1.871527
-22       2.491569
-23       2.481533
-24       2.493987
-25       2.491303
-26       2.495017
-```
-
-This stack tells you in the first column the actual amount of memory requested
-to be allocated by the Jitter RNG for the memory access in powers of 2 (Note,
-this amount is limited by the CPU's data cache size.). The second column is what
-you can ignore for this test.
-
-You now conclude that the following line is good for you because the measurement
-shows that about 1 bit of entropy per Jitter RNG time delta is received. This
-is compared with the Jitter RNG internally applied entropy rate of 1/3 bits
-of entropy per time delta which means that the Jitter RNG heuristics
-underestimates the available entropy - which is the result you want.
-
-```
-21       1.871527
-```
-
-This value means that the allocated memory is 2^21 = 2MBytes.
-
-You now have two options how to apply this value: either recompiling the
-library and use this value as the default allocation or use it as
-a flags field when allocating your Jitter RNG instance which does not
-need to change the binary.
-
-When recompiling, you need to apply the value `21` with your
-CFLAGS setting for compiling the Jitter RNG like this:
-
-`CFLAGS="-DJENT_MEMORY_BITS=21"`
-
-When using the value to allocate the Jitter RNG instance when you did not
-recompile the library code you specify this value when invoking
-`jent_entropy_init_ex` and `jent_entropy_collector_alloc` by adding the
-following to your flags field:
-
-```
-unsigned int flags = 0;
-...
-flags |= JENT_MAX_MEMSIZE_2MB;
-
-ret = jent_entropy_init_ex(0, flags);
-...
-ret = jent_entropy_collector_alloc(0, flags);
-...
-
-```
-
-Note, the Jitter RNG will allocate 1 << JENT_MEMORY_BITS
-bytes for its memory access operation, but at most what
-jent_cache_size_roundup() returns.
+In order for this approach to be meaningful, this testing would have to show the following properties:
+1. The IID testing must fail badly for the non-decimated data set, indicating that the SP 800-90B tests
+are sensitive to a style of defect present in the system. If the original data does not fail this
+testing, then we cannot use these tests to estimate the memory depth.
+2. The IID test results must generally improve as the decimation rate increases (i.e., the proportion
+of observed “passes” should generally increase).
+3. All of the IID tests must eventually “pass” at a rate consistent with the fixed p-value cutoff
+for some specific decimation rate.
 
 # Author
 Stephan Mueller <smueller@chronox.de>
+Joshua E. Hill <josh@keypair.us>
