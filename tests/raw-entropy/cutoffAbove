@@ -1,9 +1,0 @@
-#!/usr/bin/perl
-
-use strict;
-
-while(<STDIN>) { 
-	if($_ < $ARGV[0]) { 
-		print;
-	}
-}
