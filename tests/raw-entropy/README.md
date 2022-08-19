@@ -105,7 +105,7 @@ increase).
 with the fixed p-value cutoff for some specific decimation rate.
 
 # Example
-![Distributions Across Memory Sizes](https://myoctocat.com/assets/images/base-octocat.svg)
+![Distributions Across Memory Sizes](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/distanim.gif)
 # Author
 Stephan Mueller <smueller@chronox.de>
 Joshua E. Hill <josh@keypair.us>
