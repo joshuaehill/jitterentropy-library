@@ -52,50 +52,60 @@ past outputs.  The statistical memory “depth” is the number of symbols that 
 interrelationship.
 
 The approach here has essentially three steps.
-1. The distribution of timings is examined for a variety of memory settings
-(each setting is selected using the `JENT_MEMORY_BITS` define).
-For each memory setting, perform an initial review of the resulting symbol
-histograms. It is likely that using a larger memory region will significantly
-affect the observed distributions, as a larger memory region leads to more cache
-misses. This progression continues until the distribution becomes fairly fixed
-at a `terminal distribution`, whence additionally increasing the memory size has
-limited observable impact on the resulting histogram.
-On most architectures, it is useful to set the memory size to at least
-the smallest value that attains this `terminal distribution`.
+1. The distribution of timings is examined for a variety of memory
+settings (each setting is selected using the `JENT_MEMORY_BITS` define).
+For each memory setting, perform an initial review of the resulting
+symbol histograms. It is likely that using a larger memory region will
+significantly affect the observed distributions, as a larger memory
+region leads to more cache misses. This progression continues until the
+distribution becomes fairly fixed at a *terminal distribution*, whence
+additionally increasing the memory size has limited observable impact on
+the resulting histogram.  On most architectures, the delay associated
+with the cache system is likely to be both more predictible and have
+significantly lower variation, so it is useful to set the memory size
+to at least the smallest value that attains this *terminal distribution*.
 2. Select the sub-distribution of interest.  This should be a
 sub-distribution that is both common (ideally capturing over 80% of the
 observed values) and suitably broad to support a reasonable entropy level.
 This sub-distribution is provided using the `JENT_DISTRIBUTION_MIN` and
 `JENT_DISTRIBUTION_MAX` settings.
-3. Use the `analyze_depth.sh` tool to estimate the statistical memory depth of
-the system.  In order to determine what level of memory is associated with this system,
-the data is internally probabilistically decimated at a rate governed by the
-`JENT_MEMORY_DEPTH_BITS` parameter.  If a suitably large `JENT_MEMORY_DEPTH_BITS`
-setting results in the produced data set passing the NIST SP 800-90B Section 5 IID tests
-at a suitably high rate, then a histogram-based entropy estimate can be applied
-as the heuristic entropy estimate.
+3. Use the `analyze_depth.sh` tool to estimate the statistical memory
+depth of the system.  In order to determine what level of statistical
+memory depth is associated with this system, the data is probabilistically
+decimated at a rate governed by the `JENT_MEMORY_DEPTH_BITS` parameter.
+If a suitably large `JENT_MEMORY_DEPTH_BITS` setting results in the
+produced data set passing the NIST SP 800-90B Section 5 IID tests at
+a suitably high rate, then a histogram-based entropy estimate can be
+applied as the heuristic entropy estimate.
 
-A single test result from the NIST SP 800-90B tests is not meaningful for this
-testing, but it would be reasonable to instead test many
-data sets in this way. The result of such repeated testing can be viewed as “passing”
-so long as the proportion of tests passing for each IID test is larger than some fixed
-cutoff.
+A single test result from the NIST SP 800-90B tests is not meaningful
+for this testing, but it would be reasonable to instead test many data
+sets in this way. The result of such repeated testing can be viewed as
+“passing” so long as the proportion of tests passing for each IID
+test is larger than some fixed cutoff.
 
-In SP 800-90B, each IID test is designed to have a false reject rate of 1/1000. One can
-calculate the (one-sided) p-value for the number of observed test failures using the binomial
-distribution: if we denote the number of observed failures as k and the CDF of the failure
-count Binomial Distribution (with parameters p=1/1000, and  n being the number of 1 million
-sample non-overlapping data sets) as F(x), then we can calculate the p-value as 1-F(k-1).
+In SP 800-90B Section 5 IID tests, each IID test is designed to have a
+false reject rate of 1/1000. One can calculate the (one-sided) p-value
+for the number of observed test failures using the binomial distribution:
+if we denote the number of observed failures as k and the CDF of the
+failure count Binomial Distribution (with parameters p=1/1000, and  n
+being the number of 1 million sample non-overlapping data sets) as F(x),
+then we can calculate the p-value as 1-F(k-1).
 
-In order for this approach to be meaningful, this testing would have to show the following properties:
-1. The IID testing must fail badly for the non-decimated data set, indicating that the SP 800-90B tests
-are sensitive to a style of defect present in the system. If the original data does not fail this
-testing, then we cannot use these tests to estimate the memory depth.
-2. The IID test results must generally improve as the decimation rate increases (i.e., the proportion
-of observed “passes” should generally increase).
-3. All of the IID tests must eventually “pass” at a rate consistent with the fixed p-value cutoff
-for some specific decimation rate.
+In order for this approach to be meaningful, this testing would have to
+show the following properties:
+1. The IID testing must fail badly for the non-decimated data set,
+indicating that the SP 800-90B tests are sensitive to a style of defect
+present in the system. If the original data does not fail this testing,
+then we cannot use these tests to estimate the memory depth.
+2. The IID test results must generally improve as the decimation rate
+increases (i.e., the proportion of observed “passes” should generally
+increase).
+3. All of the IID tests must eventually “pass” at a rate consistent
+with the fixed p-value cutoff for some specific decimation rate.
 
+# Example
+![Distributions Across Memory Sizes](https://myoctocat.com/assets/images/base-octocat.svg)
 # Author
 Stephan Mueller <smueller@chronox.de>
 Joshua E. Hill <josh@keypair.us>
