@@ -61,7 +61,7 @@ region leads to more cache misses. This progression continues until the
 distribution becomes fairly fixed at a *terminal distribution*, whence
 additionally increasing the memory size has limited observable impact on
 the resulting histogram.  On most architectures, the delay associated
-with the cache system is likely to be both more predictable and have
+with the cache system is likely to be both more predictible and have
 significantly lower variation, so it is useful to set the memory size
 to at least the smallest value that attains this *terminal distribution*.
 2. Select the sub-distribution of interest.  This should be a
@@ -115,6 +115,12 @@ is set to 27 or larger.
 
 For this evaluation, we proceed with `JENT_MEMORY_DEPTH_BITS` setting of 28.
 
+For step 2, we perform IID testing on 149 sets of 1 million samples each.
+The results were as follows:
+
+![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/IID-testing.svg)
+
+This shows that...
 
 # Author
 Stephan Mueller <smueller@chronox.de>
