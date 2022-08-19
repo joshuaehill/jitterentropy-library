@@ -61,7 +61,7 @@ region leads to more cache misses. This progression continues until the
 distribution becomes fairly fixed at a *terminal distribution*, whence
 additionally increasing the memory size has limited observable impact on
 the resulting histogram.  On most architectures, the delay associated
-with the cache system is likely to be both more predictible and have
+with the cache system is likely to be both more predictable and have
 significantly lower variation, so it is useful to set the memory size
 to at least the smallest value that attains this *terminal distribution*.
 2. Select the sub-distribution of interest.  This should be a
@@ -105,7 +105,17 @@ increase).
 with the fixed p-value cutoff for some specific decimation rate.
 
 # Example
+A system based on an Intel Xeon 6252 CPU (36MB cache) produces the following data 
+histogram:
+
 ![Distributions Across Memory Sizes](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/distanim.gif)
+
+We see here that the memory updates resolve to memory when `JENT_MEMORY_DEPTH_BITS`
+is set to 27 or larger.
+
+For this evaluation, we proceed with `JENT_MEMORY_DEPTH_BITS` setting of 28.
+
+
 # Author
 Stephan Mueller <smueller@chronox.de>
 Joshua E. Hill <josh@keypair.us>
