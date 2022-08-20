@@ -30,9 +30,10 @@ int main(int argc, char * argv[])
 	int ret = 0;
 	unsigned int flags = 0, osr = 0;
 	struct rand_data *ec_nostir;
+	ssize_t ent_return;
 
 	if (argc < 2) {
-		printf("%s <number of measurements> [--force-fips|--disable-memory-access|--disable-internal-timer|--force-internal-timer|--osr <OSR>|--max-mem <NUM>]\n", argv[0]);
+		fprintf(stderr, "%s <number of measurements> [--force-fips|--disable-internal-timer|--force-internal-timer|--osr <OSR>|--max-mem <NUM>]\n", argv[0]);
 		return 1;
 	}
 
@@ -55,7 +56,7 @@ int main(int argc, char * argv[])
 			argc--;
 			argv++;
 			if (argc <= 1) {
-				printf("OSR value missing\n");
+				fprintf(stderr, "OSR value missing\n");
 				return 1;
 			}
 
@@ -69,7 +70,7 @@ int main(int argc, char * argv[])
 			argc--;
 			argv++;
 			if (argc <= 1) {
-				printf("Maximum memory value missing\n");
+				fprintf(stderr, "Maximum memory value missing\n");
 				return 1;
 			}
 
@@ -124,11 +125,11 @@ int main(int argc, char * argv[])
 				flags |= JENT_MAX_MEMSIZE_512MB;
 				break;
 			default:
-				printf("Unknown maximum memory value\n");
+				fprintf(stderr, "Unknown maximum memory value\n");
 				return 1;
 			}
 		} else {
-			printf("Unknown option %s\n", argv[1]);
+			fprintf(stderr, "Unknown option %s\n", argv[1]);
 			return 1;
 		}
 
@@ -138,21 +139,42 @@ int main(int argc, char * argv[])
 
 	ret = jent_entropy_init_ex(osr, flags);
 	if (ret) {
-		printf("The initialization failed with error code %d\n", ret);
+		fprintf(stderr, "jent_entropy_init_ex() failed with error code %d\n", ret);
 		return ret;
 	}
 
 	ec_nostir = jent_entropy_collector_alloc(osr, flags);
 	if (!ec_nostir) {
-		printf("Jitter RNG handle cannot be allocated\n");
+		fprintf(stderr, "Jitter RNG handle cannot be allocated\n");
 		return 1;
 	}
 
 	for (size = 0; size < rounds; size++) {
 		char tmp[32];
 
-		if (0 > jent_read_entropy_safe(&ec_nostir, tmp, sizeof(tmp))) {
-			fprintf(stderr, "FIPS 140-2 continuous test failed\n");
+		if (0 > (ent_return = jent_read_entropy(ec_nostir, tmp, sizeof(tmp)))) {
+			switch(ent_return) {
+				case -1:
+					fprintf(stderr, "Invalid entropy collector context\n");
+					break;
+				case -2:
+					fprintf(stderr, "RCT Failure\n");
+					break;
+				case -3:
+					fprintf(stderr, "APT Failure\n");
+					break;
+				case -4:
+					fprintf(stderr, "Set tick Failure\n");
+					break;
+				case -5:
+					fprintf(stderr, "LAG Failure\n");
+					break;
+				case -6:
+					fprintf(stderr, "DIST Failure\n");
+					break;
+				default:
+					fprintf(stderr, "Not really sure what just happened.\n");
+			}
 			return 1;
 		}
 		fwrite(&tmp, sizeof(tmp), 1, stdout);

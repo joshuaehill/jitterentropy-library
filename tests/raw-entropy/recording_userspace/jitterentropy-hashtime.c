@@ -66,7 +66,7 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 	if (!duration)
 		return 1;
 
-	fprintf(stderr, "Processing %s\n", pathname);
+	printf("Processing %s\n", pathname);
 
 	out_file = fopen(pathname, "w");
 	if (!out_file) {
@@ -85,8 +85,8 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		goto out;
 	}
 
-	fprintf(stderr, "Bytes of memory: 2^%g\n", log2(ec->memmask+1U));
-	fprintf(stderr, "Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_BITS);
+	printf("Bytes of memory: 2^%g\n", log2(ec->memmask+1U));
+	printf("Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_BITS);
 
 	if (!report_counter_ticks) {
 		/*
@@ -119,12 +119,12 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 	}
 
 	if ((health_test_result = jent_health_failure(ec))) {
-		printf("The jent context encountered the following health testing failure(s):");
-		if (health_test_result & JENT_RCT_FAILURE) printf(" RCT");
-		if (health_test_result & JENT_APT_FAILURE) printf(" APT");
-		if (health_test_result & JENT_LAG_FAILURE) printf(" Lag");
-		if (health_test_result & JENT_DIST_FAILURE) printf(" Dist");
-		printf("\n");
+		fprintf(stderr, "The jent context encountered the following health testing failure(s):");
+		if (health_test_result & JENT_RCT_FAILURE) fprintf(stderr, " RCT");
+		if (health_test_result & JENT_APT_FAILURE) fprintf(stderr, " APT");
+		if (health_test_result & JENT_LAG_FAILURE) fprintf(stderr, " Lag");
+		if (health_test_result & JENT_DIST_FAILURE) fprintf(stderr, " Dist");
+		fprintf(stderr, "\n");
 	}
 
 	printf("%zu / %zu (%g %%) samples in reference distribution\n", ec->in_dist_count_history, ec->data_count_history, 100.0 * (double)ec->in_dist_count_history/((double)ec->data_count_history));
@@ -161,7 +161,7 @@ int main(int argc, char * argv[])
 	char pathname[4096];
 
 	if (argc != 4 && argc != 5 && argc != 6) {
-		printf("%s <rounds per repeat> <number of repeats> <filename> <max mem>\n", argv[0]);
+		fprintf(stderr, "%s <rounds per repeat> <number of repeats> <filename> <max mem>\n", argv[0]);
 		return 1;
 	}
 
@@ -226,7 +226,7 @@ int main(int argc, char * argv[])
 			flags |= JENT_MAX_MEMSIZE_512MB;
 			break;
 		default:
-			printf("Unknown maximum memory value\n");
+			fprintf(stderr, "Unknown maximum memory value\n");
 			return 1;
 		}
 	}

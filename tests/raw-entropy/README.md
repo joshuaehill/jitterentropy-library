@@ -110,17 +110,28 @@ histogram:
 
 ![Distributions Across Memory Sizes](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/distanim.gif)
 
-We see here that the memory updates resolve to memory when `JENT_MEMORY_DEPTH_BITS`
-is set to 27 or larger.
+We see here that the memory read/write cycle is handled by actual memory
+reads when `JENT_MEMORY_BITS` is set to 27 or larger.
 
-For this evaluation, we proceed with `JENT_MEMORY_DEPTH_BITS` setting of 28.
+For this evaluation, we proceed with `JENT_MEMORY_BITS` setting of 28. The
+distribution that we are interested in is in the interval [100, 200].
 
-For step 2, we perform IID testing on 149 sets of 1 million samples each.
-The results were as follows:
+For step 2, we perform IID testing on 149 sets of 1 million samples each using
+the parameters `JENT_MEMORY_BITS` = 28, `JENT_DISTRIBUTION_MIN` = 100, and
+`JENT_DISTRIBUTION_MAX` = 200.
+
+The IID testing results were as follows:
 
 ![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/IID-testing.svg)
 
-This shows that...
+This shows that the data seems to become increasingly close to
+IID behavior as the `JENT_MEMORY_DEPTH_BITS` value is increased,
+but also shows that the rate of improvement falls off after the value
+`JENT_MEMORY_DEPTH_BITS` = 7. With this setting, the results mostly pass
+the full IID testing, so we use this as the setting.
+
+The data histogram when using this configuration is as follows:
+![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/IID-testing.svg)
 
 # Author
 Stephan Mueller <smueller@chronox.de>

@@ -16,7 +16,7 @@ export sampleSize=1000000
 export sampleRounds=149
 MEMBITS=28
 DISTMIN=100
-DISTMAX=355
+DISTMAX=200
 
 if (( (DISTMAX - DISTMIN) <= 255 )); then
 	FILETYPE="sd.bin"

@@ -1,6 +1,7 @@
 # Compile Noise Source as user space application
 
-CC ?= gcc
+#CC ?= gcc
+CC = clang-14
 #Hardening
 ENABLE_STACK_PROTECTOR ?= 1
 CFLAGS ?= -fwrapv --param ssp-buffer-size=4 -fvisibility=hidden -fPIE -Wcast-align -Wmissing-field-initializers -Wshadow -Wswitch-enum

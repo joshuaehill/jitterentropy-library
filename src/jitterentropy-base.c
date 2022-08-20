@@ -416,20 +416,15 @@ static struct rand_data
 	if (jent_notime_forced() && (flags & JENT_DISABLE_INTERNAL_TIMER))
 		return NULL;
 
+	/*Allocate the necessary memory regions.*/
 	entropy_collector = jent_zalloc(sizeof(struct rand_data));
 	if (NULL == entropy_collector)
 		return NULL;
 
-	entropy_collector->hashloops = JENT_HASHLOOPS;
-
 	memsize = jent_memsize(flags);
 	entropy_collector->mem = (volatile unsigned char *)jent_zalloc(memsize);
-
-	/* Make sure the PRNG has an initial seed before anything tries to use it. */
-	entropy_collector->prngState.u[0] = UINT64_C(0x8e93eec0697aaba7);
-	entropy_collector->prngState.u[1] = UINT64_C(0xce65608a31b35a5e);
-	entropy_collector->prngState.u[2] = UINT64_C(0xa8d46b46cb642eee);
-	entropy_collector->prngState.u[3] = UINT64_C(0xe83cef69c548c744);
+	if (entropy_collector->mem == NULL)
+		goto err;
 
 	/*
 	 * Transform the size into a mask - it is assumed that size is
@@ -437,11 +432,17 @@ static struct rand_data
 	 */
 	entropy_collector->memmask = memsize - 1;
 
-	if (entropy_collector->mem == NULL)
-		goto err;
+	/* Make sure the PRNG has an initial seed before anything tries to use it. */
+	entropy_collector->prngState.u[0] = UINT64_C(0x8e93eec0697aaba7);
+	entropy_collector->prngState.u[1] = UINT64_C(0xce65608a31b35a5e);
+	entropy_collector->prngState.u[2] = UINT64_C(0xa8d46b46cb642eee);
+	entropy_collector->prngState.u[3] = UINT64_C(0xe83cef69c548c744);
 
 	if (sha3_alloc(&entropy_collector->hash_state))
 		goto err;
+
+	/* Initialize the desired number of hashloops. */
+	entropy_collector->hashloops = JENT_HASHLOOPS;
 
 	/* Initialize the hash state */
 	sha3_256_init(entropy_collector->hash_state);
@@ -449,7 +450,10 @@ static struct rand_data
 	/* verify and set the oversampling rate */
 	if (osr < JENT_MIN_OSR)
 		osr = JENT_MIN_OSR;
+
 	entropy_collector->osr = osr;
+
+	/* Set the internal flags. */
 	entropy_collector->flags = flags;
 
 	if ((flags & JENT_FORCE_FIPS) || jent_fips_enabled())
@@ -486,9 +490,8 @@ static struct rand_data
 	/* Initialize the PRNG seed. */
 	jent_random_data(entropy_collector);
 
-	if (jent_health_failure(entropy_collector)) {
+	if (jent_health_failure(entropy_collector)>0)
 		goto err;
-	}
 
 	BUILD_BUG_ON((DATA_SIZE_BITS / 8) < sizeof(entropy_collector->prngState.b));
 	jent_read_random_block(entropy_collector, (char *)(entropy_collector->prngState.b), sizeof(entropy_collector->prngState.b));
@@ -583,7 +586,7 @@ int jent_time_entropy_init(unsigned int osr, unsigned int flags)
 	}
 
 	if (jent_notime_settick(ec)) {
-		ret = EMEM;
+		ret = ETHREAD;
 		goto out;
 	}
 
@@ -662,7 +665,13 @@ int jent_time_entropy_init(unsigned int osr, unsigned int flags)
 
 	/* First, did we encounter a health test failure? */
 	if ((health_test_result = jent_health_failure(ec))) {
-		ret = (health_test_result & JENT_RCT_FAILURE) ? ERCT : EHEALTH;
+		if(health_test_result & JENT_RCT_FAILURE) ret = ERCT;
+		else if(health_test_result & JENT_APT_FAILURE) ret = EAPT;
+		else if(health_test_result & JENT_LAG_FAILURE) ret = ELAG;
+		else if(health_test_result & JENT_DIST_FAILURE) ret = EDIST;
+		else {
+			ret = EMEM;
+		}
 		goto out;
 	}
 
