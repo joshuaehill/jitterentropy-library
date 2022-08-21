@@ -85,8 +85,9 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		goto out;
 	}
 
-	printf("Bytes of memory: 2^%g\n", log2(ec->memmask+1U));
-	printf("Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_BITS);
+	fprintf(stderr, "Bytes of memory: 2^%g\n", log2(ec->memmask+1U));
+	fprintf(stderr, "Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_BITS);
+	fprintf(stderr, "gcd: %zu\n", ec->jent_common_timer_gcd);
 
 	if (!report_counter_ticks) {
 		/*
@@ -127,7 +128,11 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		fprintf(stderr, "\n");
 	}
 
-	printf("%zu / %zu (%g %%) samples in reference distribution\n", ec->in_dist_count_history, ec->data_count_history, 100.0 * (double)ec->in_dist_count_history/((double)ec->data_count_history));
+	uint64_t dist_count = ec->in_dist_count_history + ec->current_in_dist_count;
+	uint64_t total_count = ec->data_count_history + ec->current_data_count;
+	if(total_count > 0) {
+		fprintf(stderr, "%zu / %zu (%g %%) samples in reference distribution\n", dist_count, total_count, 100.0 * (double)dist_count/((double)total_count));
+	}
 
 out:
 	free(duration);

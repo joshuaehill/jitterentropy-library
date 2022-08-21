@@ -55,23 +55,27 @@ number of past outputs.  The statistical memory “depth” is the number
 of symbols that have a significant interrelationship.
 
 The approach here has essentially three steps.
-1. The distribution of timings is examined for a variety of memory
-settings (each setting is selected using the `JENT_MEMORY_BITS` define).
-For each memory setting, perform an initial review of the resulting
+1. Histograms for noise source outputs across many candidate memory
+settings are examined in order to select the size of the memory area
+used by the primary noise source (`jent_memaccess`). Each setting
+is selected using the `JENT_MEMORY_BITS` define).  For each memory
+setting, the submitter should perform an initial review of the resulting
 symbol histograms. It is likely that using a larger memory region will
 significantly affect the observed distributions, as a larger memory
 region leads to more cache misses. This progression continues until the
-distribution becomes fairly fixed at a *terminal distribution*, whence
-additionally increasing the memory size has limited observable impact on
-the resulting histogram.  On most architectures, the delay associated
-with the cache system is likely both to be more predictable and have
-significantly lower variation, so it is useful to set the memory size
-to at least the smallest value that attains this *terminal distribution*.
+distribution becomes essentially fixed at a *terminal distribution*,
+whence additionally increasing the memory size has limited observable
+impact on the resulting histogram.  On most architectures, the delays
+associated with updates that resolve purely within the cache system are
+likely both to be more predictable and have significantly lower variation
+as compared to the same updates that resolve in RAM reads and writes,
+so it is useful to set the memory size to at least the smallest value
+that attains this *terminal distribution*.
 2. Select the sub-distribution of interest.  This should be a
 sub-distribution that is both common (ideally capturing over 80% of the
 observed values) and suitably broad to support a reasonable entropy level.
-This sub-distribution is provided using the `JENT_DISTRIBUTION_MIN` and
-`JENT_DISTRIBUTION_MAX` settings.
+This sub-distribution is provided setting the `JENT_DISTRIBUTION_MIN` and
+`JENT_DISTRIBUTION_MAX` defines.
 3. Use the `analyze_depth.sh` tool to estimate the statistical memory
 depth of the system.  In order to determine what level of statistical
 memory depth is associated with this system, the data is probabilistically
@@ -81,11 +85,11 @@ produced data set passing the NIST SP 800-90B Section 5 IID tests at
 a suitably high rate, then a histogram-based entropy estimate can be
 applied as the heuristic entropy estimate.
 
-A single test result from the NIST SP 800-90B tests is not meaningful
-for this testing, but it would be reasonable to instead test many data
-sets in this way. The result of such repeated testing can be viewed as
-“passing” so long as the proportion of tests passing for each IID
-test is larger than some fixed cutoff.
+A single test result from the NIST SP 800-90B tests is not meaningful for
+this testing, but it would be reasonable to instead test many data sets
+in this way. For each IID test, the result of such repeated testing can
+be viewed as “passing” so long as the proportion of that test passing
+is larger than some fixed cutoff.
 
 In SP 800-90B Section 5 IID tests, each IID test is designed to have a
 false reject rate of 1/1000. One can calculate the (one-sided) p-value
@@ -115,11 +119,12 @@ The following tests were conducted using a system with a Intel Xeon
 ## Test Results
 ![Distributions Across Memory Sizes](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/distanim.gif)
 
-We see here that the memory read/write cycle is handled by actual memory
-reads when `JENT_MEMORY_BITS` is set to 27 or larger.
+We see here that the memory read/update event mostly results in actual
+RAM reads when `JENT_MEMORY_BITS` is set to 27 or larger.
 
-For this evaluation, we proceed with `JENT_MEMORY_BITS` setting of 28. The
-distribution that we are interested in is in the interval [100, 200].
+For this evaluation, we proceed with `JENT_MEMORY_BITS` setting of 28
+(resulting in a memory region of 256 MB). The distribution that we are
+interested in is in the interval [100, 200]. (Note: this 
 
 For step 2, we perform IID testing on 149 sets of 1 million samples each
 using the parameters `JENT_MEMORY_BITS` = 28, `JENT_DISTRIBUTION_MIN`
@@ -148,14 +153,13 @@ via the non-IID track of SP 800-90B yields a similar estimate of $H_I
 
 The decimation has a significant impact on the data output rate for
 the JEnt library.  On the test system with `JENT_MEMORY_DEPTH_BITS`=0
-(no decimation), this library produces approximately 87 256-bit outputs
-every second. On average, the probabilistic decimation outputs a value
-approximately every 
+(no decimation), this library produces approximately 265 outputs every
+second (where each output is 256 bits). On average, the probabilistic
+decimation outputs a value approximately every
 $( 3- \frac{1}{2^{\text{JENT}\textunderscore\text{MEMORY}\textunderscore\text{DEPTH}\textunderscore\text{BITS}-1}} ) \times 2^{\text{JENT}\textunderscore\text{MEMORY}\textunderscore\text{DEPTH}\textunderscore\text{BITS}-1}$ 
-candidates, so the setting
-`JENT_MEMORY_DEPTH_BITS` = 7 reduces the output rate by a factor of
-approximately 192. As expected, this results in a rate of approximately
-0.45 outputs per second (1 output every 2.2 seconds).
+candidates, so the setting `JENT_MEMORY_DEPTH_BITS` = 7 reduces the output
+rate by a factor of approximately $191.5$. As expected, this results in a rate
+of approximately $1.4$ outputs per second.
 
 With this degree of slowdown, is use of this option "worth it"?  First,
 it is important to point out that even though `JENT_MEMORY_DEPTH_BITS`

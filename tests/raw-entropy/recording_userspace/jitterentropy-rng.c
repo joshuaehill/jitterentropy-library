@@ -165,6 +165,7 @@ int main(int argc, char * argv[])
 
         fprintf(stderr, "Bytes of memory: 2^%g\n", log2(ec->memmask+1U));
         fprintf(stderr, "Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_BITS);
+	fprintf(stderr, "gcd: %zu\n", ec->jent_common_timer_gcd);
         fprintf(stderr, "osr: %u\n", ec->osr);
 
 
@@ -211,7 +212,12 @@ int main(int argc, char * argv[])
 		exit(EX_OSERR);
 	}
 
-        fprintf(stderr, "%zu / %zu (%g %%) samples in reference distribution\n", ec->in_dist_count_history, ec->data_count_history, 100.0 * (double)ec->in_dist_count_history/((double)ec->data_count_history));
+	uint64_t dist_count = ec->in_dist_count_history + ec->current_in_dist_count;
+	uint64_t total_count = ec->data_count_history + ec->current_data_count;
+	if(total_count > 0) {
+		fprintf(stderr, "%zu / %zu (%g %%) samples in reference distribution\n", dist_count, total_count, 100.0 * (double)dist_count/((double)total_count));
+	}
+
 	fprintf(stderr, "Produced %zu outputs in %zu ns (%g outputs / s)\n", rounds, endTime-startTime, (double)rounds*1.0E9/((double)(endTime-startTime)));
 
 	jent_entropy_collector_free(ec);
