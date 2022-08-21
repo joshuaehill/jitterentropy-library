@@ -367,23 +367,36 @@ static inline uint32_t jent_memsize(unsigned int flags)
 {
 	uint32_t memsize, requested_memsize_exp;
 
+	/* First, check the flags to see if a specific memory size was requested. */
 	requested_memsize_exp = JENT_FLAGS_TO_MAX_MEMSIZE(flags) + JENT_MAX_MEMSIZE_OFFSET;
 
 	if (requested_memsize_exp == JENT_MAX_MEMSIZE_OFFSET) {
+		/* No memory size was requested using the flags. */
+		/* Next check to see if there is a requested memory size
+		 * that was compiled in.
+		 */
 		if(JENT_MEMORY_SIZE != 0) return JENT_MEMORY_SIZE;
 	} else {
+		/*There was a memory size requested at runtime using the flags. Use this.*/
 		return UINT32_C(1) << requested_memsize_exp;
 	}
 
 	/*
-	 * There is no guidance compiled in or in the provided flag
-	 * Allocate memory for adding variations based on memory access
+	 * If we have reached here, then there was neither a runtime
+	 * memory request using flags, nor was there a compiled in
+	 * requested memory size.
+	 * Try to allocate an amount of memory based on the apparent
+	 * cache size.
 	 */
 	memsize = jent_cache_size_roundup();
 
-	/* Set a default value if none was found */
+	/* Set a default value if none was found.
+	 * This is essentially arbitrary, and will surely be too small
+	 * for many systems.
+	 */
 	if (memsize == 0)
-		memsize = UINT32_C(1) << (JENT_FLAGS_TO_MAX_MEMSIZE(JENT_MAX_MEMSIZE_1MB) + JENT_MAX_MEMSIZE_OFFSET);
+		memsize = UINT32_C(1) <<
+			 (JENT_FLAGS_TO_MAX_MEMSIZE(JENT_MAX_MEMSIZE_1MB) + JENT_MAX_MEMSIZE_OFFSET);
 
 	return memsize;
 }
@@ -432,7 +445,11 @@ static struct rand_data
 	 */
 	entropy_collector->memmask = memsize - 1;
 
-	/* Make sure the PRNG has an initial seed before anything tries to use it. */
+	/* Make sure the PRNG has an initial seed before anything tries to use it.
+	 * This initial seed was randomly generated, and can be replaced with any
+	 * random value with large hamming weight. With high probability, any random 
+	 * value is fine.
+	 */
 	entropy_collector->prngState.u[0] = UINT64_C(0x8e93eec0697aaba7);
 	entropy_collector->prngState.u[1] = UINT64_C(0xce65608a31b35a5e);
 	entropy_collector->prngState.u[2] = UINT64_C(0xa8d46b46cb642eee);

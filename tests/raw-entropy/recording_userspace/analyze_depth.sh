@@ -14,6 +14,8 @@ set -eu
 OUTDIR="../results-measurements"
 export sampleSize=1000000
 export sampleRounds=149
+
+#These parameters are hardware specific. These are the values used in the example.
 MEMBITS=28
 DISTMIN=100
 DISTMAX=200
