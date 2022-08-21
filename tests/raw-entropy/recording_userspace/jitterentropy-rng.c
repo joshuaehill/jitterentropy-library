@@ -21,15 +21,29 @@
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+#include <math.h>
+#include <sysexits.h>
 
 #include "jitterentropy.h"
+
+static uint64_t current_nanoseconds() {
+        uint64_t tmp = 0;
+        struct timespec time;
+        if (clock_gettime(CLOCK_REALTIME, &time) == 0)
+        {
+                tmp = ((uint64_t)time.tv_sec & 0xFFFFFFFF) * 1000000000UL;
+                tmp = tmp + (uint64_t)time.tv_nsec;
+        }
+        return tmp;
+}
 
 int main(int argc, char * argv[])
 {
 	unsigned long size, rounds;
 	int ret = 0;
 	unsigned int flags = 0, osr = 0;
-	struct rand_data *ec_nostir;
+	struct rand_data *ec;
 	ssize_t ent_return;
 
 	if (argc < 2) {
@@ -143,16 +157,27 @@ int main(int argc, char * argv[])
 		return ret;
 	}
 
-	ec_nostir = jent_entropy_collector_alloc(osr, flags);
-	if (!ec_nostir) {
+	ec = jent_entropy_collector_alloc(osr, flags);
+	if (!ec) {
 		fprintf(stderr, "Jitter RNG handle cannot be allocated\n");
 		return 1;
 	}
 
-	for (size = 0; size < rounds; size++) {
-		char tmp[32];
+        fprintf(stderr, "Bytes of memory: 2^%g\n", log2(ec->memmask+1U));
+        fprintf(stderr, "Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_BITS);
+        fprintf(stderr, "osr: %u\n", ec->osr);
 
-		if (0 > (ent_return = jent_read_entropy(ec_nostir, tmp, sizeof(tmp)))) {
+
+	volatile char *tmp = calloc(rounds, 32);
+	if(tmp == NULL) {
+		fprintf(stderr, "Can't allocate output buffer.\n");
+		exit(EX_OSERR);
+	}
+
+	volatile uint64_t startTime = current_nanoseconds();
+
+	for (size = 0; size < rounds; size++) {
+		if (0 > (ent_return = jent_read_entropy(ec, (char *)(tmp+32*size), 32))) {
 			switch(ent_return) {
 				case -1:
 					fprintf(stderr, "Invalid entropy collector context\n");
@@ -177,10 +202,19 @@ int main(int argc, char * argv[])
 			}
 			return 1;
 		}
-		fwrite(&tmp, sizeof(tmp), 1, stdout);
 	}
 
-	jent_entropy_collector_free(ec_nostir);
+	volatile uint64_t endTime = current_nanoseconds();
+
+	if(fwrite((void *)tmp, 32, rounds, stdout) != rounds) {
+		fprintf(stderr, "Can't write data\n");
+		exit(EX_OSERR);
+	}
+
+        fprintf(stderr, "%zu / %zu (%g %%) samples in reference distribution\n", ec->in_dist_count_history, ec->data_count_history, 100.0 * (double)ec->in_dist_count_history/((double)ec->data_count_history));
+	fprintf(stderr, "Produced %zu outputs in %zu ns (%g outputs / s)\n", rounds, endTime-startTime, (double)rounds*1.0E9/((double)(endTime-startTime)));
+
+	jent_entropy_collector_free(ec);
 
 	return 0;
 }

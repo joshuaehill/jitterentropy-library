@@ -2,9 +2,6 @@
 #
 # Tool to generate test results for various Jitter RNG memory settings
 #
-# This tool is only needed if you have insufficient entropy. See ../README.md
-# for details
-#
 
 OUTDIR="../results-measurements"
 export sampleSize=1000000

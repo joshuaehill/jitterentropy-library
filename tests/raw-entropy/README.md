@@ -61,7 +61,7 @@ region leads to more cache misses. This progression continues until the
 distribution becomes fairly fixed at a *terminal distribution*, whence
 additionally increasing the memory size has limited observable impact on
 the resulting histogram.  On most architectures, the delay associated
-with the cache system is likely to be both more predictible and have
+with the cache system is likely to be both more predictable and have
 significantly lower variation, so it is useful to set the memory size
 to at least the smallest value that attains this *terminal distribution*.
 2. Select the sub-distribution of interest.  This should be a
@@ -105,9 +105,11 @@ increase).
 with the fixed p-value cutoff for some specific decimation rate.
 
 # Example
-A system based on an Intel Xeon 6252 CPU (36MB cache) produces the following data 
-histogram:
+## Test System
+The following tests were conducted using a system with a Intel Xeon 
+6252 CPU (36MB cache) and 384 GB memory.
 
+## Test Results
 ![Distributions Across Memory Sizes](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/distanim.gif)
 
 We see here that the memory read/write cycle is handled by actual memory
@@ -131,8 +133,52 @@ but also shows that the rate of improvement falls off after the value
 the full IID testing, so we use this as the setting.
 
 The data histogram when using this configuration is as follows:
-![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/IID-testing.svg)
+![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/final-hist.svg)
 
-# Author
-Stephan Mueller <smueller@chronox.de>
+Now that the source is behaving as a predominantly IID source, we can directly
+produce an estimate for the entropy, namely approximately $- log_2 ( 0.047 ) \approx 4.3$
+bits of min entropy per symbol. Assessment via the non-IID track of SP 800-90B yields a
+similar estimate of $H_I \approx 3.97$ bits of min entropy per symbol.
+
+## Commentary
+
+The decimation has a significant impact on the data output rate for
+the JEnt library.  On the test system with `JENT_MEMORY_DEPTH_BITS`=0
+(no decimation), this library produces approximately 87 256-bit outputs
+every second. On average, the probabilistic decimation outputs a value
+approximately every 
+$( 3- \frac{1}{2^{\text{JENT}\textunderscore\text{MEMORY}\textunderscore\text{DEPTH}\textunderscore\text{BITS}-1}} ) \times 2^{\text{JENT}\textunderscore\text{MEMORY}\textunderscore\text{DEPTH}\textunderscore\text{BITS}-1}$ 
+candidates, so the setting
+`JENT_MEMORY_DEPTH_BITS` = 7 reduces the output rate by a factor of
+approximately 192. As expected, this results in a rate of approximately
+0.45 outputs per second (1 output ever 2.2 seconds).
+
+With this degree of slowdown, is use of this option "worth it"?  First,
+it is important to point out that even though `JENT_MEMORY_DEPTH_BITS`
+may look like it is "throwing away" significant amounts of (possibly
+entropy-containing) data, the decimated values are fed into the
+conditioner as "supplemental data". As such, though no entropy can be
+formally claimed associated with this data, in practice any entropy
+would be retained within the conditioning function.  As such, use of
+this value is expected to only make the security of the system better,
+as considerably more data is sent into the conditioning function. 
+
+Second, it is useful to note that, while the decimated data and
+non-decimated data seem to perform essentially the same way in the SP
+800-90B non-IID entropy estimators, IID testing indicates that there is
+a significant difference between the decimated and non-decimated data
+streams. This suggests that the non-decimated data suffers from some
+statistical flaws that are not detected (and thus not accounted for) by
+the non-IID entropy estimators. This suggests that decimation helps
+prevent over crediting entropy in the system (thus there is a technical
+reason for including the decimation beyond production of a defensible
+heuristic entropy estimate.)
+
+In the case where one is unconcerned with a formal validation or the
+abstract risk of over-estimating the produced entropy, it is probably
+reasonable to set `JENT_MEMORY_DEPTH_BITS` = 0. Otherwise, it is best to
+select an architecture-specific value supported by the described testing.
+
+# Authors
+Stephan Mueller <smueller@chronox.de> 
 Joshua E. Hill <josh@keypair.us>
