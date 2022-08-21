@@ -1,9 +1,9 @@
 # Jitter RNG SP800-90B Entropy Analysis Tool
 
-This archive contains the SP800-90B analysis tool to be used for the Jitter RNG.
-The tool set consists of the following individual tools:
+This archive contains the SP800-90B analysis tool to be used for the
+Jitter RNG.  The tool set consists of the following individual tools:
 
-- `recording_userspace`: This tools is used to gather the raw entropy of
+- `recording_userspace`: This tool is used to gather the raw entropy of
   the user space Jitter RNG implementation.
 
 See the README files in the different sub directories.
@@ -12,9 +12,9 @@ See the README files in the different sub directories.
 
 ## Runtime Tests
 
-The result of the data analysis performed with `validation-runtime` contains
-in the file `jent-raw-noise-0001.minentropy_FF_8bits.var.txt` at the bottom data
-like the following:
+The result of the data analysis performed with `validation-runtime`
+contains in the file `jent-raw-noise-0001.minentropy_FF_8bits.var.txt`
+at the bottom data like the following:
 
 ```
 H_original: 2.387470
@@ -23,33 +23,36 @@ H_bitstring: 0.337104
 min(H_original, 8 X H_bitstring): 2.387470
 ```
 
-The last value gives you an upper bound for the min entropy per time delta.
-That means for one time delta the given number of entropy in bits is
-expected to be less than this value on average.
+The last value gives you an upper bound for the min entropy per time
+delta.  That means for one time delta the given number of entropy in
+bits is expected to be less than this value on average.
 
-The Jitter RNG heuristic presumes 1/`osr` bit of entropy per
-time delta. This implies that the measurement must show that *at least* 1/`osr` bit
-of entropy is present. In the example above, the measurement shows that
-as much as 2.3 bits of entropy is present which implies that the available amount of
-entropy may be more than what the Jitter RNG heuristic applies.
+The Jitter RNG heuristic presumes 1/`osr` bit of entropy per time
+delta. This implies that the measurement must show that *at least*
+1/`osr` bit of entropy is present. In the example above, the measurement
+shows that as much as 2.3 bits of entropy is present which implies that
+the available amount of entropy may be more than what the Jitter RNG
+heuristic applies.
 
-In more formal validation settings, it is necessary to separately estimate a
-heuristic lower bound for the entropy.
+In more formal validation settings, it is necessary to separately estimate
+a heuristic lower bound for the entropy.
 
 # Approach to Justify a Particular Heuristic Entropy Estimate
 
-In general, it is difficult to produce a stochastic model for non-physical noise
-sources that apply across different hardware. In this section, we present an
-approach for generating a technical (heuristic) argument for why this noise
-source can support a stated entropy rate on particular hardware.
+In general, it is difficult to produce a stochastic model for non-physical
+noise sources that applies across different hardware. In this section,
+we present an approach for generating a technical (heuristic) argument
+for why this noise source can support a stated entropy rate on particular
+hardware.
 
-One can characterize an IID noise source using only an adequately detailed histogram,
-as the min entropy of such a source established by the symbol probabilities viewed in
-isolation. For a non-IID noise source, this yields only an upper bound for the min
-entropy. This occurs because non-IID sources have statistical memory, that is there is
-internal state that induces relationships between the current output and some number of
-past outputs.  The statistical memory “depth” is the number of symbols that have a significant
-interrelationship.
+One can characterize an IID noise source using only an adequately detailed
+histogram, as the min entropy of such a source is established by the
+symbol probabilities viewed in isolation. For a non-IID noise source,
+this yields only an upper bound for the min entropy. This occurs because
+non-IID sources have statistical memory: that is, there is an internal
+state that induces relationships between the current output and some
+number of past outputs.  The statistical memory “depth” is the number
+of symbols that have a significant interrelationship.
 
 The approach here has essentially three steps.
 1. The distribution of timings is examined for a variety of memory
@@ -61,7 +64,7 @@ region leads to more cache misses. This progression continues until the
 distribution becomes fairly fixed at a *terminal distribution*, whence
 additionally increasing the memory size has limited observable impact on
 the resulting histogram.  On most architectures, the delay associated
-with the cache system is likely to be both more predictable and have
+with the cache system is likely both to be more predictable and have
 significantly lower variation, so it is useful to set the memory size
 to at least the smallest value that attains this *terminal distribution*.
 2. Select the sub-distribution of interest.  This should be a
@@ -118,9 +121,9 @@ reads when `JENT_MEMORY_BITS` is set to 27 or larger.
 For this evaluation, we proceed with `JENT_MEMORY_BITS` setting of 28. The
 distribution that we are interested in is in the interval [100, 200].
 
-For step 2, we perform IID testing on 149 sets of 1 million samples each using
-the parameters `JENT_MEMORY_BITS` = 28, `JENT_DISTRIBUTION_MIN` = 100, and
-`JENT_DISTRIBUTION_MAX` = 200.
+For step 2, we perform IID testing on 149 sets of 1 million samples each
+using the parameters `JENT_MEMORY_BITS` = 28, `JENT_DISTRIBUTION_MIN`
+= 100, and `JENT_DISTRIBUTION_MAX` = 200.
 
 The IID testing results were as follows:
 
@@ -135,10 +138,11 @@ the full IID testing, so we use this as the setting.
 The data histogram when using this configuration is as follows:
 ![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/final-hist.svg)
 
-Now that the source is behaving as a predominantly IID source, we can directly
-produce an estimate for the entropy, namely approximately $- log_2 ( 0.047 ) \approx 4.3$
-bits of min entropy per symbol. Assessment via the non-IID track of SP 800-90B yields a
-similar estimate of $H_I \approx 3.97$ bits of min entropy per symbol.
+Now that the source is behaving as a predominantly IID source, we can
+directly produce an estimate for the entropy, namely approximately $-
+log_2 ( 0.047 ) \approx 4.3$ bits of min entropy per symbol. Assessment
+via the non-IID track of SP 800-90B yields a similar estimate of $H_I
+\approx 3.97$ bits of min entropy per symbol.
 
 ## Commentary
 
@@ -151,7 +155,7 @@ $( 3- \frac{1}{2^{\text{JENT}\textunderscore\text{MEMORY}\textunderscore\text{DE
 candidates, so the setting
 `JENT_MEMORY_DEPTH_BITS` = 7 reduces the output rate by a factor of
 approximately 192. As expected, this results in a rate of approximately
-0.45 outputs per second (1 output ever 2.2 seconds).
+0.45 outputs per second (1 output every 2.2 seconds).
 
 With this degree of slowdown, is use of this option "worth it"?  First,
 it is important to point out that even though `JENT_MEMORY_DEPTH_BITS`
