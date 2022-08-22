@@ -144,10 +144,12 @@ The data histogram when using this configuration is as follows:
 ![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/final-hist.svg)
 
 Now that the source is behaving as a predominantly IID source, we can
-directly produce an estimate for the entropy, namely approximately $-
-log_2 ( 0.047 ) \approx 4.3$ bits of min entropy per symbol. Assessment
-via the non-IID track of SP 800-90B yields a similar estimate of $H_I
-\approx 3.97$ bits of min entropy per symbol.
+directly produce an estimate for the entropy, namely approximately 
+$$- \log_2 ( 0.047 ) \approx 4.3 $$
+bits of min entropy per symbol. Assessment
+via the non-IID track of SP 800-90B yields a similar estimate of 
+$H_I \approx 3.97$ 
+bits of min entropy per symbol.
 
 ## Commentary
 
