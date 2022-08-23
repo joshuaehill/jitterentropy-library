@@ -117,6 +117,40 @@ The following tests were conducted using a system with a Intel Xeon
 6252 CPU (36MB cache) and 384 GB memory.
 
 ## Test Results
+
+On x86-64 platforms, the rdtsc (“Read Time-Stamp Counter”) instruction
+provides a clock that runs at some CPU-defined clock rate. From ["Intel
+64 and IA-32 Architectures Software Developer’s Manual, Volume 3",
+Section 17.17]:
+
+> The time-stamp counter ... is a 64-bit counter that is set to 0
+> following a RESET of the processor. Following a RESET, the counter
+> increments even when the processor is halted...
+>
+> Processor families increment the time-stamp counter differently:
+> [(Older) Option 1:] the time-stamp counter increments with every internal processor clock cycle.
+>
+> [(Newer) Option 2:] the time-stamp counter increments at a constant
+> rate... Constant TSC behavior ensures that the duration of each clock
+> tick is uniform and supports the use of the TSC as a wall clock timer
+> even if the processor core changes frequency. This is the architectural
+> behavior moving forward…
+>
+> The time stamp counter in newer processors may support an enhancement,
+> referred to as invariant TSC... This is the architectural behavior moving
+> forward. On processors with invariant TSC support, the OS may use the
+> TSC for wall clock timer services...  The features supported can be
+> identified by using the CPUID instruction.
+
+With Linux systems, the “invariant TSC” CPU feature is available when
+both the `constant_tsc` and `nonstop_tsc` CPU feature flags are
+present in /proc/cpuinfo.
+
+On this platform, the used counter is the TSC, so the counter is
+sufficiently fine-grained to support `JENT_MEMACCESSLOOP_BITS` = 0. On a
+different platform, had the distribution been very narrow, we may have
+had to increase this parameter.
+
 ![Distributions Across Memory Sizes](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/distanim.gif)
 
 We see here that the memory read/update event mostly results in actual

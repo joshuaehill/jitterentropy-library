@@ -180,7 +180,8 @@ struct rand_data
 #define JENT_MEMORY_DEPTH_BITS 0
 #endif
 
-#define JENT_HASHLOOPS 1
+#define JENT_HASHLOOP_BITS 0
+#define JENT_MEMACCESSLOOP_BITS 0
 	volatile unsigned char *mem;	/* Memory access location with size of
 					 * JENT_MEMORY_SIZE or memsize */
 	uint32_t memmask;		/* Memory mask (size of memory - 1) */
@@ -188,7 +189,9 @@ struct rand_data
                 uint64_t u[4];
                 uint8_t b[sizeof(uint64_t) * 4];
         } prngState;
-	unsigned int hashloops;		/* Number of hash invocations per random
+	unsigned int hash_loop_bits;	/* Number of hash invocations per random
+					 * bit generation */
+	unsigned int memaccess_loop_bits;/* Number of hash invocations per random
 					 * bit generation */
 
 	#define JENT_DIST_WINDOW 10000U

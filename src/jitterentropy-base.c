@@ -459,7 +459,8 @@ static struct rand_data
 		goto err;
 
 	/* Initialize the desired number of hashloops. */
-	entropy_collector->hashloops = JENT_HASHLOOPS;
+	entropy_collector->hash_loop_bits = JENT_HASHLOOP_BITS;
+	entropy_collector->memaccess_loop_bits = JENT_MEMACCESSLOOP_BITS;
 
 	/* Initialize the hash state */
 	sha3_256_init(entropy_collector->hash_state);

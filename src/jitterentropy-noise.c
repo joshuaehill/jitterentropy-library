@@ -134,7 +134,8 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time)
 {
 	HASH_CTX_ON_STACK(ctx);
 	uint8_t intermediary[SHA3_256_SIZE_DIGEST];
-	uint64_t j = 0, i = 0;
+	uint64_t j = 0, hash_loops = UINT64_C(1) << ec->hash_loop_bits;;
+	unsigned int i = 0;
 	uint64_t endtime = 0, current_delta = 0;
 	uint64_t pseudoRandomData[PR_DATA_LEN];
 
@@ -154,7 +155,7 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time)
 	* interested in one Keccack1600 compression operation performed with
 	* the sha3_final.
 	*/
-	for (j = 0; j < ec->hashloops; j++) {
+	for (j = 0; j < hash_loops; j++) {
 		/* Chain any prior results from this process.
 		 * There is no assumption of unpredictability here.
 		 */
@@ -247,23 +248,33 @@ static uint64_t jent_memaccess(struct rand_data *ec)
 	 * The starttime / endtime / ec->mem values are all volatile.
 	 */
 	volatile uint64_t starttime = 0, endtime = 0;
+	volatile unsigned char *tmpval;
+	uint64_t j, memaccess_loops;
 
 	if (NULL == ec || NULL == ec->mem)
 		return 0;
 
+	memaccess_loops = UINT64_C(1) << ec->memaccess_loop_bits;
+
 	jent_get_nstime_internal(ec, &starttime);
 
-	/* Take PRNG output to find the memory location to update. */
-	volatile unsigned char *tmpval = ec->mem +
-				(xoshiro256starstar(ec->prngState.u) &
-				 ec->memmask);
-
-	/*
-	 * memory access: just add 1 to one byte,
-	 * wrap at 255 -- memory access implies read
-	 * from and write to memory location
+	/* memaccess_loops should only be adjusted until the recorded distribution
+	 * can be effectively captured with the available counter resolution.
+	 * On some systems (like all modern Intel systems) the available timer
+	 * is so fine that a memaccess_loops value of 1 is sufficient.
 	 */
-	*tmpval = (unsigned char)((*tmpval + 1) & 0xff);
+
+	for(j=0; j<memaccess_loops; j++) {
+		/* Take PRNG output to find the memory location to update. */
+		tmpval = ec->mem + (xoshiro256starstar(ec->prngState.u) & ec->memmask);
+
+		/*
+		 * memory access: just add 1 to one byte,
+		 * wrap at 255 -- memory access implies read
+		 * from and write to memory location
+		 */
+		*tmpval = (unsigned char)((*tmpval + 1) & 0xff);
+	}
 
 	jent_get_nstime_internal(ec, &endtime);
 
