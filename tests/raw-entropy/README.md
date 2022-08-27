@@ -271,7 +271,7 @@ the JEnt library.  On the test system with `JENT_MEMORY_DEPTH_BITS = 0`
 second (where each output is 256 bits). On average, the probabilistic
 decimation outputs a value approximately every
 
-$$\left (3 \times 2^{\text{JENT\\_MEMORY\\_DEPTH\\_BITS} - 1} - 1 \right)$$
+$$3 \times 2^{\text{JENT\\_MEMORY\\_DEPTH\\_BITS} - 1} - \frac{1}{2}$$
 
 candidates, so the setting `JENT_MEMORY_DEPTH_BITS = 7` reduces the output
 rate by a factor of approximately 191.5. As expected, this results in a rate
