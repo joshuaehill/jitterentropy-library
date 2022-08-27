@@ -124,6 +124,24 @@ as `F(x)` , then we can calculate the p-value as
 
 $$p_{\text{value}} = 1-F \left( k-1 \right) \text{.}$$
 
+SP 800-90B uses a p-velue cutoff of 1%, so for this testing, we want
+a test failure cutoff so that the overall test has a 99% chance of
+passing when the null hypothesis is true (that is, when the source is
+actually IID). If we call the per-test chance of failure  `q`,
+we can bound the chance of observing one or more failures in the the 22
+independent SP 800-90B Section 5 IID tests as
+
+$$ 1 - \left( 1 - q \right)^{22} \leq 0.01 $$
+
+or equivalently
+
+$$ q \leq 1 - 0.99^{1/22} \approx 0.000456729 \text{.}$$
+
+For this per-test cutoff and 147 tests, we find that we can tolerate up
+to 3 failures on a per-test basis. If 4 or more failures are observed,
+then we conclude that the source is non-IID (that is, we reject the null
+hypothesis with a 1% significance).
+
 In order for this approach to be meaningful, this testing would have to
 show the following properties:
 
@@ -134,8 +152,9 @@ then we cannot use these tests to estimate the memory depth.
 * Property B: The IID test results must generally improve as the decimation rate
 increases (i.e., the proportion of observed “passes” should generally
 increase).
-* Property C: All of the IID tests must eventually “pass” at a rate consistent
-with the fixed p-value cutoff for some specific decimation rate.
+* Property C: All of the IID tests must eventually “pass” at a rate
+consistent with the fixed p-value cutoff for some specific selection of
+`JENT_MEMORY_DEPTH_BITS`.
 
 ## Example
 ### Test System
@@ -198,25 +217,26 @@ For this evaluation, we proceed with `JENT_MEMORY_BITS` setting of 28
 
 For Step 3, The distribution that we are interested in is in the interval [100, 200].
 
-For Step 4, we used the `analyze_depth.sh` script to generate 149 million
+For Step 4, we used the `analyze_depth.sh` script to generate 147 million
 samples for each of the tested `JENT_MEMORY_DEPTH_BITS` settings, using
 the parameters `JENT_MEMORY_BITS = 28`, `JENT_DISTRIBUTION_MIN = 100`,
-and `JENT_DISTRIBUTION_MAX = 200`.  We then performed IID testing on
-the resulting data sets of 149 subsets of 1 million samples for each
-`JENT_MEMORY_DEPTH_BITS` setting. The IID testing results were as follows:
+and `JENT_DISTRIBUTION_MAX = 200`.  We then performed IID testing on each
+of the 147 1-million sample subsets for each `JENT_MEMORY_DEPTH_BITS`
+setting. The IID testing results were as follows:
 
 ![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/IID-testing.svg)
 
-Here, a "round" is a full SP 800-90B IID test round, which is considered
-to be "passing" if and only if using all 22 of the IID tests pass. The
+Here, a "round" is a full SP 800-90B IID test round conducted on one of the
+data subsets, which is considered
+to be "passing" if and only if all 22 of the IID tests pass for that particular subset. The
 "Tests Passing" refers to the total proportion of the IID tests that
-pass across all 149 tested subsets for each tested memory depth setting.
+pass across all 147 tested subsets for each tested memory depth setting.
 
 This shows that the data seems to become increasingly close to
 IID behavior as the `JENT_MEMORY_DEPTH_BITS` value is increased.
 Note that this satisfies all of the properties described above:
 
-* Property A: for `JENT_MEMORY_DEPTH_BITS = 0`, 100% of the 149 distinct rounds fail
+* Property A: for `JENT_MEMORY_DEPTH_BITS = 0`, 100% of the 147 distinct rounds fail
 the SP 800-90B Section 5 IID testing.
 * Property B: It is clear from the "Tests Passing" proportion that more tests
 tend to pass as `JENT_MEMORY_DEPTH_BITS` is increased.
