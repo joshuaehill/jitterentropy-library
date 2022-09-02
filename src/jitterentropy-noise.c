@@ -116,10 +116,7 @@ static uint64_t jent_loop_shuffle(struct rand_data *ec, unsigned int bits, unsig
 }
 
 /**
- * CPU Jitter noise source -- this is the noise source based on the CPU
- * 			      execution time jitter
- *
- * This function injects the time value into the conditioning function.
+ * Integrates the jent_memaccess timing into the conditioning function.
  *
  * @ec [in] entropy collector struct
  * @time [in] time delta to be injected
@@ -127,10 +124,32 @@ static uint64_t jent_loop_shuffle(struct rand_data *ec, unsigned int bits, unsig
  * Output:
  * updated hash context
  */
+static void jent_hash_time(struct rand_data *ec, uint64_t time)
+{
+	/* If the data is within the expected distribution, then include
+	 * the current_delta value is a noise source output from the primary noise source.
+	 * In this case, if the health tests are currently passing, then this input is treated as
+	 * contributing at least 1/osr bits of min entropy.
+	 * If the health tests are not currently passing,  then this data is treated as not
+	 * contributing any min entropy.
+	 * If the data is outside of the expected distribution, this is treated as additional
+	 * "supplemental data", and is treated as not contributing any min entropy.
+	 */
+	sha3_update(ec->hash_state, (uint8_t *)&time, sizeof(time));
+}
 
+/**
+ * CPU Jitter additional noise source -- this is the noise source based on the CPU
+ * 			      execution time jitter
+ *
+ * @ec [in] entropy collector struct
+ *
+ * Output:
+ * updated hash context
+ */
 /*The same size as the internal SHA-3 state size*/
 #define PR_DATA_LEN 25
-static void jent_hash_time(struct rand_data *ec, uint64_t time)
+static void jent_hash_additional(struct rand_data *ec)
 {
 	HASH_CTX_ON_STACK(ctx);
 	uint8_t intermediary[SHA3_256_SIZE_DIGEST];
@@ -188,7 +207,7 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time)
         current_delta = jent_delta(ec->prev_time, endtime) / ec->jent_common_timer_gcd;
 	ec->prev_time = endtime;
 
-	/* Data to provide to the conditioning function:
+	/* Data to provide to the conditioning function here:
 	 * 1) The result of the hash operation.
 	 * In SP 800-90B, this is viewed as "supplemental data" (as described in FIPS 140-3 IG D.K Resolution 6)
 	 * and is viewed as contributing no entropy to the system (it acts essentially as a nonce).
@@ -202,17 +221,6 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time)
 	 * (which combined the two noise sources).
 	 */
 	sha3_update(ec->hash_state, (uint8_t *)&current_delta, sizeof(current_delta));
-
-	/* 3) If the data is within the expected distribution, then include
-	 * the current_delta value is a noise source output from the primary noise source.
-	 * In this case, if the health tests are currently passing, then this input is treated as
-	 * contributing at least 1/osr bits of min entropy.
-	 * If the health tests are not currently passing,  then this data is treated as not
-	 * contributing any min entropy.
-	 * If the data is outside of the expected distribution, this is treated as additional
-	 * "supplemental data", and is treated as not contributing any min entropy.
-	 */
-	sha3_update(ec->hash_state, (uint8_t *)&time, sizeof(time));
 }
 
 /**
@@ -325,6 +333,12 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 		jent_dist_insert(ec, current_delta);
 
 	} while (ec->current_in_dist_count < observed_symbol_target);
+
+	/*
+	 * Integrate the additional noise source and supplemental information into the
+	 * conditioning function.
+	 */
+	jent_hash_additional(ec);
 
 	/*
 	 * This is in the identified distribution that we are looking for,

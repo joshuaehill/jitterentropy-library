@@ -8,43 +8,20 @@ See the README files in the different sub directories.
 # Runtime Tests
 
 Statistical entropy estimates are performed using NIST's `ea_noniid` tool.
-The final results of this testing (when using two verbose flags) look like this:
-```
-H_bitstring = 0.61449352149098757
-H_bitstring Per Symbol = 4.3014546504369129
-H_original = 4.3830259853234228
-Assessed min entropy: 4.3014546504369129
-```
-
-The last value gives you an upper bound for the min entropy per time
-delta, namely 
-$$H_{\text{original}} \approx 4.3 \text{ and } n \times H_{\text{bitstring}} \approx 4.3 \text{.}$$
-
-That means for one time delta the given number of entropy in
-bits is expected to be less than this value on average.
 
 The Jitter RNG uses a parameter called `osr` as the basis for its
 internal entropy estimate for each raw noise sample. This parameter
 is set when allocating the jitter entropy context using the
 `jent_entropy_collector_alloc` call.
 
-The Jitter RNG internally presumes that the raw noise contains 
+The Jitter RNG internally presumes that the raw noise contains
 
 $$H_{\text{min}} \geq \frac{1}{\texttt{osr}}$$
 
 per raw noise sample ("time delta"). This implies that the statistical
-entropy estimate must show that at least 
-
-$$\frac{1}{\texttt{osr}}$$
-
-bits of min entropy is present. In the
-example above, the measurement shows that as much as 4.3 bits of entropy
-is present which implies that the available amount of entropy may be
-more than what the Jitter RNG heuristic applies even when setting `osr` to
-the smallest possible value (`osr = 1`).
-
-In more formal validation settings, it is necessary to separately estimate
-a heuristic lower bound for the entropy.
+entropy estimate (`H_original` in SP 800-90B terminology) must be at
+least this value.  In more formal validation settings, it is necessary
+to separately estimate a heuristic lower bound for the entropy.
 
 # Approach to Justify a Particular Heuristic Entropy Estimate
 
@@ -54,14 +31,15 @@ we present an approach for generating a technical (heuristic) argument
 for why this noise source can support a stated entropy rate on particular
 hardware.
 
+## General Approach
 One can characterize an IID noise source using only an adequately detailed
 histogram, as the min entropy of such a source is established by the
 symbol probabilities viewed in isolation. For a non-IID noise source,
 this yields only an upper bound for the min entropy. This occurs because
-non-IID sources have statistical memory: that is, there is an internal
+non-IID sources have statistical memory: that is, there is internal
 state that induces relationships between the current output and some
 number of past outputs.  The statistical memory “depth” is the number
-of symbols that have a significant interrelationship.
+of symbols for which that state induces a significant interrelationship.
 
 The approach here has essentially four steps.
 1. Use the `analyze_memsize.sh` script to generate (non-decimated)
@@ -69,53 +47,60 @@ data samples for a wide variety of memory sizes.
 2. Create and examine raw data histograms for noise source outputs across
 the tested candidate memory settings in order to select the size of the
 memory area used by the primary noise source (`jent_memaccess`). Each
-setting is selected using the `JENT_MEMORY_BITS` define).  For each memory
-setting, the submitter should perform an initial review of the resulting
-symbol histograms. It is likely that using a larger memory region will
-significantly affect the observed distributions, as a larger memory
-region leads to more cache misses. This progression continues until the
+setting is selected using the `JENT_MEMORY_BITS` macro).  For each
+memory setting, the submitter should perform an initial review of the
+resulting symbol histograms. It is likely that using a larger memory
+region will significantly affect the observed distributions, as a larger
+memory region leads to more cache misses and/or a different mix of hits
+for the various cache levels. This progression continues until the
 distribution becomes essentially fixed at a *terminal distribution*,
 whence additionally increasing the memory size has limited observable
 impact on the resulting histogram.  On most architectures, the delays
 associated with updates that resolve purely within the cache system are
-likely both to be more predictable and have significantly lower variation
-as compared to the same updates that resolve in RAM reads and writes,
-so it is useful to set the memory size to at least the smallest value
-that attains this *terminal distribution*. Testing thus far suggests
-that this terminal distribution is attained when approximately 10 times
-the local cache size is allocated for the `jent_memaccess` buffer.
-3. Select a single sub-distribution of interest.  This should be a
-sub-distribution that is both common (ideally the selected sub-distribution would include over 80% of the
-observed values) and suitably broad to support a reasonable entropy level.
-This sub-distribution is provided setting the `JENT_DISTRIBUTION_MIN` and
-`JENT_DISTRIBUTION_MAX` defines.
-4. Use the `analyze_depth.sh` tool (using the selected `JENT_MEMORY_BITS`,
-`JENT_DISTRIBUTION_MIN` and `JENT_DISTRIBUTION_MAX` settings)
-to estimate the statistical memory depth of the system.  In order
-to determine what level of statistical memory depth is associated
-with this system, the data is probabilistically decimated at a rate
-governed by the `JENT_MEMORY_DEPTH_BITS` parameter.  If a tested
-`JENT_MEMORY_DEPTH_BITS` setting results in the produced data set
+both more predictable and have significantly lower variation as compared
+to the same updates that resolve in RAM reads and writes, so it is useful
+to set the memory size to at least the smallest value that attains this
+*terminal distribution*. Testing thus far suggests that this terminal
+distribution is generally attained before the memory size of the the
+`jent_memaccess` buffer is 10 times the cache size.
+3. Select a single sub-distribution of interest.  This should
+be a sub-distribution that is both common (ideally the selected
+sub-distribution would include over 80% of the observed values)
+and suitably broad to support a reasonable entropy level.  This
+sub-distribution is provided while setting the `JENT_DISTRIBUTION_MIN` and
+`JENT_DISTRIBUTION_MAX` macros.
+4. Configure the `analyze_depth.sh` tool by inputting the selected
+`JENT_MEMORY_BITS`, `JENT_DISTRIBUTION_MIN` and `JENT_DISTRIBUTION_MAX`
+settings, and run this script to help estimate the statistical memory
+depth of the system.  The timing data is probabilistically decimated
+at a rate governed by the `JENT_MEMORY_DEPTH_BITS` parameter.  If a
+tested `JENT_MEMORY_DEPTH_BITS` setting results in the produced data set
 passing the NIST SP 800-90B Section 5 IID tests at a suitably high rate,
 then a histogram-based entropy estimate can be applied as the heuristic
 entropy estimate.
 
-A single test result from the NIST SP 800-90B tests is not meaningful
+A passing combination of the `JENT_MEMORY_BITS`, `JENT_DISTRIBUTION_MIN`,
+`JENT_DISTRIBUTION_MAX`, and `JENT_MEMORY_DEPTH_BITS` should then be
+used for the library.
+
+## Statistically Meaningful IID Testing
+A single test result from the NIST SP 800-90B IID tests is not meaningful
 for this testing, but it would be reasonable to instead test many data
-sets in this way. For each IID test (e.g., Excursion Test Statistic,
-Chi-Square Independence test, etc.), the result of such repeated testing
-can be viewed as “passing” so long as the proportion of that test
-passing is larger than some pre-determined cutoff.
+sets in this way. For each of the 22 IID tests (e.g., Excursion Test
+Statistic, Chi-Square Independence test, etc.), the result of repeated
+testing using disjoint data subsets can be viewed as “passing”
+so long as the proportion of that test passing is larger than some
+pre-determined cutoff.
 
-In SP 800-90B Section 5 IID tests, each IID test is designed to have a
-false reject rate of 
+In the SP 800-90B Section 5 IID tests, each IID test is designed to have
+a false reject rate of
 
-$$p_{\text{false reject}} = \frac{1}{1000} \text{.}$$
+$$p_{\text{per-test false reject}} = \frac{1}{1000} \text{.}$$
 
-One can calculate the (one-sided) p-value
-for the number of observed test failures using the binomial distribution:
-if we denote the number of observed failures as `k` and the CDF of the
-failure count Binomial Distribution (with parameters 
+One can calculate the (one-sided) p-value for the number of observed
+test failures using the binomial distribution: if we denote the number
+of observed failures as `k` and the CDF of the failure count Binomial
+Distribution (with parameters
 
 $$p=\frac{1}{1000}$$
 
@@ -124,12 +109,14 @@ as `F(x)` , then we can calculate the p-value as
 
 $$p_{\text{value}} = 1-F \left( k-1 \right) \text{.}$$
 
-SP 800-90B uses a p-velue cutoff of 1%, so for this testing, we want
-a test failure cutoff so that the overall test has a 99% chance of
-passing when the null hypothesis is true (that is, when the source is
-actually IID). If we call the per-test chance of failure  `q`,
-we can bound the chance of observing one or more failures in the the 22
-independent SP 800-90B Section 5 IID tests as
+SP 800-90B uses a significance of 1%, so for this testing, we want to
+select a test failure cutoff so that the overall round (that is, all
+22 tests) has a 99% chance of passing when the null hypothesis is true
+(that is, when the source is actually IID). For this to occur, all 22 of
+the IID tests need to pass, and under the null hypothesis, these tests
+are independent.  If we call the targeted per-test chance of failure
+`q`, then we can bound the chance of observing one or more failures in
+the the 22 independent SP 800-90B Section 5 IID tests as
 
 $$ 1 - \left( 1 - q \right)^{22} \leq 0.01 $$
 
@@ -137,10 +124,13 @@ or equivalently
 
 $$ q \leq 1 - 0.99^{1/22} \approx 0.000456729 \text{.}$$
 
-For this per-test cutoff and 147 tests, we find that we can tolerate up
-to 3 failures on a per-test basis. If 4 or more failures are observed,
-then we conclude that the source is non-IID (that is, we reject the null
-hypothesis with a 1% significance).
+For this per-test cutoff and 147 tests, we find that we can tolerate
+up to 3 failures on a per-test basis. In this case, if 4 or more
+failures are observed for any specific IID test then we conclude that
+the source is non-IID (that is, we reject the null hypothesis with a 1%
+significance). Similarly, if all tests have 3 or fewer failures, then the
+testing supports the hypothesis that the noise source is IID (and thus,
+we have decimated sufficiently).
 
 In order for this approach to be meaningful, this testing would have to
 show the following properties:
@@ -153,12 +143,12 @@ then we cannot use these tests to estimate the memory depth.
 increases (i.e., the proportion of observed “passes” should generally
 increase).
 * Property C: All of the IID tests must eventually “pass” at a rate
-consistent with the fixed p-value cutoff for some specific selection of
+consistent with the cutoff developed above for some specific selection of
 `JENT_MEMORY_DEPTH_BITS`.
 
 ## Example
 ### Test System
-The following tests were conducted using a system with a Intel Xeon 
+The following tests were conducted using a system with a Intel Xeon
 6252 CPU (36MB cache) and 384 GB memory.
 
 ### Counter Source
@@ -191,93 +181,126 @@ both the `constant_tsc` and `nonstop_tsc` CPU feature flags are
 present in /proc/cpuinfo.
 
 On this platform, the used counter is the TSC, so the counter is
-sufficiently fine-grained to support `JENT_MEMACCESSLOOP_BITS = 0`. On a
-different platform, had the distribution been very narrow, we may have
-had to increase this parameter.
+sufficiently fine-grained to support `JENT_MEMACCESSLOOP_BITS = 0`. On
+a platform where the observed distribution is very narrow we may have
+to increase this parameter. Note: increasing this parameter too much
+will lead to nearly full entropy samples, which will result in the system
+not fulfilling Property A.  It is useful to use the smallest value of
+`JENT_MEMACCESSLOOP_BITS` that yields a reasonable distribution.
 
 ### Test Results
-For step #1, The `analyze_memsize.sh` script was used to generate (non-decimated) data for
-setting between 10 and 30. 
+For step #1, The `analyze_memsize.sh` script was used to generate
+(non-decimated) data for settings between 10 and 30.
 
 For Step #2, the following histograms were generated:
 
 ![Distributions Across Memory Sizes](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/distanim.gif)
 
-Note: This (and all following diagrams and specified values) are number
-of distinct increments of the counter. In the tested architecture, the
-counter is incremented in multiples of 2, so all values used by JEnt
-are divided by this common factor.
+Note: This (and all following diagrams and specified values) are with
+respect to the number of distinct increments of the counter. In the
+tested architecture, the counter is incremented in multiples of 2,
+so all values used by JEnt are divided by this common factor.
 
 We see here that the memory read/update event mostly results in actual
-RAM reads when `JENT_MEMORY_BITS` is set to 27 or larger; the last three
-histograms show essentially the same behavior.
+RAM reads when `JENT_MEMORY_BITS` is set to 27 or larger; the last two
+histograms show essentially the same behavior. As such, the terminal
+distribution occurs when `JENT_MEMORY_BITS` is 28 or higher.
 
-For this evaluation, we proceed with `JENT_MEMORY_BITS` setting of 28
-(resulting in a memory region of 256 MB). 
+For this evaluation, we proceed with the `JENT_MEMORY_BITS` setting of 28
+(resulting in a memory region of 256 MB).
 
-For Step 3, The distribution that we are interested in is in the interval [100, 200].
+For Step 3, the distribution that we are interested in is in the interval [105, 185].
 
 For Step 4, we used the `analyze_depth.sh` script to generate 147 million
 samples for each of the tested `JENT_MEMORY_DEPTH_BITS` settings, using
-the parameters `JENT_MEMORY_BITS = 28`, `JENT_DISTRIBUTION_MIN = 100`,
-and `JENT_DISTRIBUTION_MAX = 200`.  We then performed IID testing on each
+the parameters `JENT_MEMORY_BITS = 28`, `JENT_DISTRIBUTION_MIN = 105`,
+and `JENT_DISTRIBUTION_MAX = 185`.  We then performed IID testing on each
 of the 147 1-million sample subsets for each `JENT_MEMORY_DEPTH_BITS`
 setting. The IID testing results were as follows:
 
 ![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/IID-testing.svg)
 
-Here, a "round" is a full SP 800-90B IID test round conducted on one of the
-data subsets, which is considered
-to be "passing" if and only if all 22 of the IID tests pass for that particular subset. The
-"Tests Passing" refers to the total proportion of the IID tests that
-pass across all 147 tested subsets for each tested memory depth setting.
+Here, a "round" is a full SP 800-90B IID test round conducted on one of
+the disjoint data subsets of 1-million samples.  A round is considered
+to be passing if and only if all 22 of the IID tests pass for that
+particular subset. The "Tests Passing" refers to the total proportion
+of the IID tests that pass across all 147 tested subsets for each tested
+memory depth setting.
 
-This shows that the data seems to become increasingly close to
-IID behavior as the `JENT_MEMORY_DEPTH_BITS` value is increased.
-Note that this satisfies all of the properties described above:
+This shows that the data seems to become increasingly close to IID
+behavior as the `JENT_MEMORY_DEPTH_BITS` value is increased.  Note that
+this distribution family seems to satisfy all of the properties described
+above:
 
-* Property A: for `JENT_MEMORY_DEPTH_BITS = 0`, 100% of the 147 distinct rounds fail
-the SP 800-90B Section 5 IID testing.
-* Property B: It is clear from the "Tests Passing" proportion that more tests
-tend to pass as `JENT_MEMORY_DEPTH_BITS` is increased.
-* Property C: Most of the rounds of testing pass when `JENT_MEMORY_DEPTH_BITS = 7`
-or higher.
+* Property A: For `JENT_MEMORY_DEPTH_BITS = 0`, 100% of the 147 distinct
+rounds fail the SP 800-90B Section 5 IID testing.
+* Property B: It is clear from the "Tests Passing" proportion that more
+tests tend to pass as `JENT_MEMORY_DEPTH_BITS` is increased.
+* Property C: The required number of each test pass when
+`JENT_MEMORY_DEPTH_BITS = 11`.
 
-We also note that the rate of improvement of the "Rounds Passing" proportion falls off 
-after the value `JENT_MEMORY_DEPTH_BITS = 7`. With this setting, the results mostly pass
-the full IID testing, so we use this as the setting.
+We note that the data passes under the above interpretation for
+`JENT_MEMORY_DEPTH_BITS = 11`.
 
-Using the parameters `JENT_MEMORY_DEPTH_BITS = 7`, `JENT_MEMORY_BITS = 28`, `JENT_DISTRIBUTION_MIN = 100`,
-and `JENT_DISTRIBUTION_MAX = 200`, the source produces the following histogram.
+Using the parameters `JENT_MEMORY_DEPTH_BITS = 11`, `JENT_MEMORY_BITS =
+28`, `JENT_DISTRIBUTION_MIN = 105`, and `JENT_DISTRIBUTION_MAX = 185`,
+the source produces the following histogram.
+
 ![IID Testing Results](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/final-hist.svg)
 
-Now that the source is behaving as an essentially IID source, we can
-directly produce an estimate for the entropy, namely approximately 
+Now that the source is behaving as an IID source, we can directly produce
+an estimate for the entropy, namely approximately
 
-$$H_{\text{submitter}} = - \log_2 ( 0.047 ) \approx 4.3 $$
-
-bits of min entropy per symbol. Assessment
-via the non-IID track of SP 800-90B yields a similar estimate of 
-
-$$ H_I = \text{min} \left( H_{\text{original}},  n \times H_{\text{bitstring}}, H_{\text{submitter}} \right) \approx 4.3 $$
+$$H_{\text{submitter}} = - \log_2 ( 0.0518297 ) \approx 4.27$$
 
 bits of min entropy per symbol.
 
+The results from the SP 800-90B non-IID statistical estimation track
+(when using two verbose flags) is as follows:
+
+```
+[...]
+H_bitstring = 0.50729119109721543
+H_bitstring Per Symbol = 3.5510383376805081
+H_original = 4.1991141990845975
+Assessed min entropy: 3.5510383376805081
+```
+
+The last value gives you an upper bound for the min entropy per time
+delta, namely
+$$H_{\text{original}} \approx 4.2 \text{ and } n \times H_{\text{bitstring}} \approx 3.5 \text{.}$$
+
+We then have a min entropy estimate of
+
+$$ H_I = \text{min} \left( H_{\text{original}},  n \times H_{\text{bitstring}}, H_{\text{submitter}} \right) \approx 3.5 $$
+
+bits of min entropy per symbol.
+
+In the example above, the measurement shows that as much as 3.5 bits of
+entropy can be credited which implies that the available amount of entropy
+may be more than what the Jitter RNG heuristic applies even when setting
+`osr` to the smallest possible value (`osr = 1`).
+
 ## Commentary
 
-The decimation has a significant impact on the data output rate for
-the JEnt library.  On the test system with `JENT_MEMORY_DEPTH_BITS = 0`
-(no decimation), this library produces approximately 265 outputs every
-second (where each output is 256 bits). On average, the probabilistic
-decimation outputs a value approximately every
+The decimation has a significant impact on the rate that the noise source
+outputs data, and this has an impact on the rate that the library can
+output conditioned data. On the test system with `JENT_MEMORY_DEPTH_BITS
+= 0` (no decimation), this entropy source produces approximately 287
+conditioned outputs every second (where each output is 256 bits). On
+average, the probabilistic decimation outputs a value from the noise
+source approximately every
 
 $$3 \times 2^{\text{JENT\\_MEMORY\\_DEPTH\\_BITS} - 1} - \frac{1}{2}$$
 
-candidates, so the setting `JENT_MEMORY_DEPTH_BITS = 7` reduces the output
-rate by a factor of approximately 191.5. As expected, this results in a rate
-of approximately 1.4 outputs per second.
+candidates, so the setting `JENT_MEMORY_DEPTH_BITS = 11` reduces the
+output rate from the noise source by a factor of approximately 3071.5. As
+it turns out, the conditioning time dwarfs the memory update time, so
+this results in a rate of approximately 1.5 outputs per second (which is
+considerably faster than if the noise source output rate was the determining
+factor.)
 
-With this degree of slowdown, is use of this option "worth it"?  First,
+With this degree of slowdown, is the use of this option "worth it"?  First,
 it is important to point out that even though `JENT_MEMORY_DEPTH_BITS`
 may look like it is "throwing away" significant amounts of (possibly
 entropy-containing) data, the decimated values are fed into the
@@ -285,18 +308,29 @@ conditioner as "supplemental data". As such, though no entropy can be
 formally claimed associated with this data, in practice any entropy
 would be retained within the conditioning function.  As such, use of
 this value is expected to only make the security of the system better,
-as considerably more data is sent into the conditioning function. 
+as considerably more data is sent into the conditioning function.
 
-Second, it is useful to note that, while the decimated data and
+If we look at the statistical assessment of the non-decimated data,
+we find the following:
+
+```
+[...]
+H_bitstring = 0.48854235733379042
+H_bitstring Per Symbol = 3.419796501336533
+H_original = 3.8331319722313415
+Assessed min entropy: 3.419796501336533
+```
+
+It is useful to note that, while the decimated data and
 non-decimated data seem to perform essentially the same way in the SP
 800-90B non-IID entropy estimators, IID testing indicates that there is
 a significant difference between the decimated and non-decimated data
 streams. This suggests that the non-decimated data suffers from some
 statistical flaws that are not detected (and thus not accounted for) by
 the non-IID entropy estimators. This suggests that decimation helps
-prevent over crediting entropy in the system (thus there is a technical
+prevent over crediting entropy in the system, and thus there is a technical
 reason for including the decimation beyond production of a defensible
-heuristic entropy estimate.)
+heuristic entropy estimate.
 
 In the case where one is unconcerned with a formal validation or the
 abstract risk of over-estimating the produced entropy, it is probably
@@ -304,5 +338,5 @@ reasonable to set `JENT_MEMORY_DEPTH_BITS = 0`. Otherwise, it is best to
 select an architecture-specific value supported by the described testing.
 
 # Authors
-Stephan Mueller <smueller@chronox.de> 
+Stephan Mueller <smueller@chronox.de>
 Joshua E. Hill <josh@keypair.us>
