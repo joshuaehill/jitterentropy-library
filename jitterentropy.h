@@ -165,33 +165,28 @@ struct rand_data
 	uint64_t last_delta2;		/* SENSITIVE stuck test */
 #endif /* JENT_HEALTH_LAG_PREDICTOR */
 
-	unsigned int flags;		/* Flags used to initialize */
+	uint32_t flags;			/* Flags used to initialize */
 	unsigned int osr;		/* Oversampling rate */
 
-#ifdef JENT_MEMORY_BITS
-# define JENT_MEMORY_SIZE (UINT32_C(1)<<JENT_MEMORY_BITS)
+#ifndef JENT_MEMORY_SIZE_EXP
+# define JENT_MEMORY_SIZE_EXP 0
 #endif
 
-#ifndef JENT_MEMORY_SIZE
-# define JENT_MEMORY_SIZE 0
+#ifndef JENT_MEMORY_DEPTH_EXP
+#define JENT_MEMORY_DEPTH_EXP 0
 #endif
 
-#ifndef JENT_MEMORY_DEPTH_BITS
-#define JENT_MEMORY_DEPTH_BITS 0
-#endif
-
-#define JENT_HASHLOOP_BITS 0
-#define JENT_MEMACCESSLOOP_BITS 0
-	volatile unsigned char *mem;	/* Memory access location with size of
-					 * JENT_MEMORY_SIZE or memsize */
-	uint32_t memmask;		/* Memory mask (size of memory - 1) */
+#define JENT_HASHLOOP_EXP 0
+#define JENT_MEMACCESSLOOP_EXP 0
+	volatile unsigned char *mem;	/* Memory access location */
+	uint32_t memsize_exp;		/* mem is size 2^memsize_exp */
         union {
                 uint64_t u[4];
                 uint8_t b[sizeof(uint64_t) * 4];
         } prngState;
-	unsigned int hash_loop_bits;	/* Number of hash invocations per random
+	unsigned int hash_loop_exp;	/* Number of hash invocations per random
 					 * bit generation */
-	unsigned int memaccess_loop_bits;/* Number of hash invocations per random
+	unsigned int memaccess_loop_exp;/* Number of hash invocations per random
 					 * bit generation */
 
 	#define JENT_DIST_WINDOW 10000U
@@ -218,7 +213,6 @@ struct rand_data
 	unsigned int apt_base_set:1;	/* APT base reference set? */
 	unsigned int fips_enabled:1;
 	unsigned int enable_notime:1;	/* Use internal high-res timer */
-	unsigned int max_mem_set:1;	/* Maximum memory configured by user */
 
 #ifdef JENT_CONF_ENABLE_INTERNAL_TIMER
 	volatile uint8_t notime_interrupt;	/* indicator to interrupt ctr */
@@ -296,28 +290,56 @@ struct rand_data
 					     compliance. */
 
 /* Flags field limiting the amount of memory to be used for memory access */
-#define JENT_FLAGS_TO_MEMSIZE_SHIFT	28
-#define JENT_FLAGS_TO_MAX_MEMSIZE(val)	(val >> JENT_FLAGS_TO_MEMSIZE_SHIFT)
-#define JENT_MAX_MEMSIZE_TO_FLAGS(val)	(val << JENT_FLAGS_TO_MEMSIZE_SHIFT)
-#define JENT_MAX_MEMSIZE_32kB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C( 1))
-#define JENT_MAX_MEMSIZE_64kB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C( 2))
-#define JENT_MAX_MEMSIZE_128kB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C( 3))
-#define JENT_MAX_MEMSIZE_256kB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C( 4))
-#define JENT_MAX_MEMSIZE_512kB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C( 5))
-#define JENT_MAX_MEMSIZE_1MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C( 6))
-#define JENT_MAX_MEMSIZE_2MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C( 7))
-#define JENT_MAX_MEMSIZE_4MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C( 8))
-#define JENT_MAX_MEMSIZE_8MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C( 9))
-#define JENT_MAX_MEMSIZE_16MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C(10))
-#define JENT_MAX_MEMSIZE_32MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C(11))
-#define JENT_MAX_MEMSIZE_64MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C(12))
-#define JENT_MAX_MEMSIZE_128MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C(13))
-#define JENT_MAX_MEMSIZE_256MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C(14))
-#define JENT_MAX_MEMSIZE_512MB		JENT_MAX_MEMSIZE_TO_FLAGS(UINT32_C(15))
-#define JENT_MAX_MEMSIZE_MAX		JENT_MAX_MEMSIZE_512MB
-#define JENT_MAX_MEMSIZE_MASK		JENT_MAX_MEMSIZE_MAX
-/* We start at 32kB -> offset is log2(32768) */
-#define JENT_MAX_MEMSIZE_OFFSET		14
+/*These are stored in the high order nibble of the flags.*/
+/* We start at 64kB, and 1>>(1+15) offset is 2^16 */
+/* We end at 1GB, and 1>>(15+15) offset is 2^30 */
+#define JENT_MEMSIZE_OFFSET		15
+
+#define JENT_MEMSIZE_EXP_TO_SIZE(val)	(UINT32_C(1)<<val)
+#define JENT_MEMSIZE_EXP_TO_MASK(val)	((UINT32_C(1)<<val)-1)
+
+#define JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT	28
+#define JENT_MAX_MEMSIZE_64kB		(UINT32_C( 1) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_128kB		(UINT32_C( 2) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_256kB		(UINT32_C( 3) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_512kB		(UINT32_C( 4) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_1MB		(UINT32_C( 5) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_2MB		(UINT32_C( 6) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_4MB		(UINT32_C( 7) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_8MB		(UINT32_C( 8) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_16MB		(UINT32_C( 9) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_32MB		(UINT32_C(10) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_64MB		(UINT32_C(11) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_128MB		(UINT32_C(12) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_256MB		(UINT32_C(13) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_512MB		(UINT32_C(14) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+#define JENT_MAX_MEMSIZE_1024MB		(UINT32_C(15) << JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT)
+
+#define JENT_MAX_MEMSIZE_DEFAULT	JENT_MAX_MEMSIZE_1024MB
+#define JENT_MAX_MEMSIZE_MASK		JENT_MAX_MEMSIZE_1024MB
+#define JENT_FLAGS_TO_MAX_MEMSIZE_EXP(val)	(((val&JENT_MAX_MEMSIZE_MASK)>>JENT_FLAGS_TO_MAX_MEMSIZE_SHIFT) + JENT_MEMSIZE_OFFSET)
+
+#define JENT_FLAGS_TO_MEMSIZE_SHIFT	24
+#define JENT_MEMSIZE_64kB		(UINT32_C( 1) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_128kB		(UINT32_C( 2) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_256kB		(UINT32_C( 3) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_512kB		(UINT32_C( 4) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_1MB		(UINT32_C( 5) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_2MB		(UINT32_C( 6) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_4MB		(UINT32_C( 7) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_8MB		(UINT32_C( 8) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_16MB		(UINT32_C( 9) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_32MB		(UINT32_C(10) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_64MB		(UINT32_C(11) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_128MB		(UINT32_C(12) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_256MB		(UINT32_C(13) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_512MB		(UINT32_C(14) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+#define JENT_MEMSIZE_1024MB		(UINT32_C(15) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
+
+#define JENT_MEMSIZE_DEFAULT		JENT_MEMSIZE_1MB
+#define JENT_MEMSIZE_MASK		JENT_MEMSIZE_1024MB
+#define JENT_FLAGS_TO_MEMSIZE_EXP(val)	(((val&JENT_MEMSIZE_MASK)>>JENT_FLAGS_TO_MEMSIZE_SHIFT) + JENT_MEMSIZE_OFFSET)
+#define JENT_MEMSIZE_EXP_TO_FLAGS(val)	((val - JENT_MEMSIZE_OFFSET) << JENT_FLAGS_TO_MEMSIZE_SHIFT)
 
 # define JENT_MIN_OSR	1
 

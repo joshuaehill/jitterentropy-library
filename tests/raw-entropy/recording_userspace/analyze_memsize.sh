@@ -11,7 +11,7 @@ FILETYPE="u64.bin"
 
 for bits in {10..30}
 do
-	export CFLAGS="-DJENT_MEMORY_BITS=$bits"
+	export CFLAGS="-DJENT_MEMORY_SIZE_EXP=$bits"
 
 	./invoke_testing.sh
 

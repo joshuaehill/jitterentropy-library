@@ -85,8 +85,8 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		goto out;
 	}
 
-	fprintf(stderr, "Bytes of memory: 2^%g\n", log2(ec->memmask+1U));
-	fprintf(stderr, "Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_BITS);
+	fprintf(stderr, "Bytes of memory: 2^%u\n", ec->memsize_exp);
+	fprintf(stderr, "Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_EXP);
 	fprintf(stderr, "gcd: %zu\n", ec->jent_common_timer_gcd);
 
 	if (!report_counter_ticks) {
@@ -186,49 +186,49 @@ int main(int argc, char * argv[])
 			/* Allow to set no option */
 			break;
 		case 1:
-			flags |= JENT_MAX_MEMSIZE_32kB;
+			flags |= JENT_MEMSIZE_64kB;
 			break;
 		case 2:
-			flags |= JENT_MAX_MEMSIZE_64kB;
+			flags |= JENT_MEMSIZE_128kB;
 			break;
 		case 3:
-			flags |= JENT_MAX_MEMSIZE_128kB;
+			flags |= JENT_MEMSIZE_256kB;
 			break;
 		case 4:
-			flags |= JENT_MAX_MEMSIZE_256kB;
+			flags |= JENT_MEMSIZE_512kB;
 			break;
 		case 5:
-			flags |= JENT_MAX_MEMSIZE_512kB;
+			flags |= JENT_MEMSIZE_1MB;
 			break;
 		case 6:
-			flags |= JENT_MAX_MEMSIZE_1MB;
+			flags |= JENT_MEMSIZE_2MB;
 			break;
 		case 7:
-			flags |= JENT_MAX_MEMSIZE_2MB;
+			flags |= JENT_MEMSIZE_4MB;
 			break;
 		case 8:
-			flags |= JENT_MAX_MEMSIZE_4MB;
+			flags |= JENT_MEMSIZE_8MB;
 			break;
 		case 9:
-			flags |= JENT_MAX_MEMSIZE_8MB;
+			flags |= JENT_MEMSIZE_16MB;
 			break;
 		case 10:
-			flags |= JENT_MAX_MEMSIZE_16MB;
+			flags |= JENT_MEMSIZE_32MB;
 			break;
 		case 11:
-			flags |= JENT_MAX_MEMSIZE_32MB;
+			flags |= JENT_MEMSIZE_64MB;
 			break;
 		case 12:
-			flags |= JENT_MAX_MEMSIZE_64MB;
+			flags |= JENT_MEMSIZE_128MB;
 			break;
 		case 13:
-			flags |= JENT_MAX_MEMSIZE_128MB;
+			flags |= JENT_MEMSIZE_256MB;
 			break;
 		case 14:
-			flags |= JENT_MAX_MEMSIZE_256MB;
+			flags |= JENT_MEMSIZE_512MB;
 			break;
 		case 15:
-			flags |= JENT_MAX_MEMSIZE_512MB;
+			flags |= JENT_MEMSIZE_1024MB;
 			break;
 		default:
 			fprintf(stderr, "Unknown maximum memory value\n");

@@ -153,7 +153,7 @@ static void jent_hash_additional(struct rand_data *ec)
 {
 	HASH_CTX_ON_STACK(ctx);
 	uint8_t intermediary[SHA3_256_SIZE_DIGEST];
-	uint64_t j = 0, hash_loops = UINT64_C(1) << ec->hash_loop_bits;;
+	uint64_t j = 0, hash_loops = UINT64_C(1) << ec->hash_loop_exp;;
 	unsigned int i = 0;
 	uint64_t endtime = 0, current_delta = 0;
 	uint64_t pseudoRandomData[PR_DATA_LEN];
@@ -262,7 +262,7 @@ static uint64_t jent_memaccess(struct rand_data *ec)
 	if (NULL == ec || NULL == ec->mem)
 		return 0;
 
-	memaccess_loops = UINT64_C(1) << ec->memaccess_loop_bits;
+	memaccess_loops = UINT64_C(1) << ec->memaccess_loop_exp;
 
 	jent_get_nstime_internal(ec, &starttime);
 
@@ -274,7 +274,7 @@ static uint64_t jent_memaccess(struct rand_data *ec)
 
 	for(j=0; j<memaccess_loops; j++) {
 		/* Take PRNG output to find the memory location to update. */
-		tmpval = ec->mem + (xoshiro256starstar(ec->prngState.u) & ec->memmask);
+		tmpval = ec->mem + (xoshiro256starstar(ec->prngState.u) & JENT_MEMSIZE_EXP_TO_MASK(ec->memsize_exp));
 
 		/*
 		 * memory access: just add 1 to one byte,
@@ -315,7 +315,7 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 	uint64_t separation;
 	uint64_t observed_symbol_target;
 
-	separation = jent_loop_shuffle(ec, JENT_MEMORY_DEPTH_BITS, JENT_MEMORY_DEPTH_BITS);
+	separation = jent_loop_shuffle(ec, JENT_MEMORY_DEPTH_EXP, JENT_MEMORY_DEPTH_EXP);
 	observed_symbol_target = ec->current_in_dist_count + separation;
 
 	do {
