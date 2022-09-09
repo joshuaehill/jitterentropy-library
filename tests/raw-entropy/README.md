@@ -147,7 +147,7 @@ increase).
 consistent with the cutoff developed above for some specific selection of
 `JENT_MEMORY_DEPTH_EXP`.
 
-## Example
+## Worked Example
 ### Test System
 The following tests were conducted using a system with a Intel Xeon
 6252 CPU (36MB cache) and 384 GB memory.
