@@ -189,6 +189,9 @@ struct rand_data
 	unsigned int memaccess_loop_exp;/* Number of hash invocations per random
 					 * bit generation */
 
+	uint64_t distribution_min;	/* The smallest value considered to be in the targeted sub-distribution. */
+	uint64_t distribution_max;	/* The largest value considered to be in the targeted sub-distribution. */
+
 	#define JENT_DIST_WINDOW 10000U
 	uint64_t current_data_count;	/* The total number of timing values that have been observed. */
 	uint64_t current_in_dist_count;	/*The total number of timing values within the expected distribution.*/

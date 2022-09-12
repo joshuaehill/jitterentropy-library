@@ -313,10 +313,9 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 	uint64_t current_delta;
 	unsigned int stuck;
 	uint64_t separation;
-	uint64_t observed_symbol_target;
+	uint64_t observed_symbols=0;
 
 	separation = jent_loop_shuffle(ec, JENT_MEMORY_DEPTH_EXP, JENT_MEMORY_DEPTH_EXP);
-	observed_symbol_target = ec->current_in_dist_count + separation;
 
 	do {
 		/* Invoke the primary noise source (the memory access noise source)*/
@@ -330,9 +329,11 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 		 */
 		jent_hash_time(ec, current_delta);
 
-		jent_dist_insert(ec, current_delta);
+		/*The distribution test will tell us if this is the desired sub-distribution.*/
+		if(jent_dist_insert(ec, current_delta))
+			observed_symbols++;
 
-	} while (ec->current_in_dist_count < observed_symbol_target);
+	} while (observed_symbols < separation);
 
 	/*
 	 * Integrate the additional noise source and supplemental information into the

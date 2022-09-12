@@ -475,6 +475,10 @@ static struct rand_data
 	entropy_collector->hash_loop_exp = JENT_HASHLOOP_EXP;
 	entropy_collector->memaccess_loop_exp = JENT_MEMACCESSLOOP_EXP;
 
+	/* Initialize the expected sub-distribution. */
+	entropy_collector->distribution_min = JENT_DISTRIBUTION_MIN;
+	entropy_collector->distribution_max = JENT_DISTRIBUTION_MAX;
+
 	/* Initialize the hash state */
 	sha3_256_init(entropy_collector->hash_state);
 
@@ -507,6 +511,9 @@ static struct rand_data
 		 * won't hurt anything.
 		 */
 		entropy_collector->jent_common_timer_gcd = 1;
+		/* If the GCD isn't set reasonably, then the identified sub-distribution bound values aren't meaningful. */
+		entropy_collector->distribution_min = UINT64_C(0);
+		entropy_collector->distribution_max = UINT64_C(0xFFFFFFFFFFFFFFFF);
 	}
 
 	/*

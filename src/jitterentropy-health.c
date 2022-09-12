@@ -84,12 +84,16 @@ void jent_dist_test(struct rand_data *ec)
  * @ec [in] Reference to entropy collector
  * @current_delta [in] Current time delta
  */
-void jent_dist_insert(struct rand_data *ec, uint64_t current_delta)
+unsigned int jent_dist_insert(struct rand_data *ec, uint64_t current_delta)
 {
 	ec->current_data_count++;
 	/* Is this in the reference distribution? */
-	if((ec->jent_common_timer_gcd == 0) || ((current_delta >= JENT_DISTRIBUTION_MIN) && (current_delta <= JENT_DISTRIBUTION_MAX)))
+	if((current_delta >= ec->distribution_min) && (current_delta <= ec->distribution_max)) {
 		ec->current_in_dist_count++;
+		return 1U;
+	} else {
+		return 0U;
+	}
 }
 
 /***************************************************************************
