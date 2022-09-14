@@ -41,6 +41,16 @@ state that induces relationships between the current output and some
 number of past outputs.  The statistical memory “depth” is the number
 of symbols for which that state induces a significant interrelationship.
 
+If the impact of past outputs is significant in future outputs, then
+any histogram is possible while simultaneously having vanishingly small
+entropy levels. Similarly, the SP 800-90B entropy estimators are often
+capable of producing meaningful min entropy bounds for single reasonably
+stable distributions, but they are likely to (sometimes dramatically)
+overestimate the available min entropy when they are provided data from a
+progression of distinct distributions, even when these sub-distributions
+are sampled in a completely deterministic fashion.
+
+This approach attempts to address these assessment challenges.
 The approach here has essentially four steps.
 1. Use the `analyze_memsize.sh` script to generate (non-decimated)
 data samples for a wide variety of memory sizes.
