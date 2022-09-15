@@ -24,7 +24,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-#include <math.h>
 #include <assert.h>
 
 #include "jitterentropy-sha3.c"
