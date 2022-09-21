@@ -14,13 +14,13 @@ over the base JEnt behavior.
 
 2. With this new JEnt behavior the underlying variation that is being assessed is essentially governed by a small amount of hardware. As such, unrelated software changes are unlikely to significantly alter this behavior, so an assessment on a system using this new behavior is expected to be more durable than an assessment of the base JEnt behavior. In comparison, with the base JEnt behavior, the observed emergent behavior could be significantly impacted by apparently unrelated software or loading changes.
 
-3. Even the relatively simple memory I/O timing used by the primary noise source in the new JEnt behavior can resolve in a number of ways (predominantly L1 cache, L2 cache, L3 cache, and RAM I/O), each with their own sub-distribution.  In the updated JEnt behavior we are able to identify the specific sub-distribution that we are interested in and configure the noise source so that it only outputs values from this sub-distribution.  Once we have this relatively simpler timing distribution, health testing becomes dramatically more powerful and statistical assessment becomes dramatically more meaningful.  This approach may also reduce the need for data translation: in the [Worked Example](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/README.md), no translation was required to reduce the symbol size. With the base JEnt behavior the tester is directed to analyze the lower byte of the data, essentially superimposing possibly dozens of distinct sub-distributions (each of which resulted from the timing differences experienced during different sets of events, each with their own associated timing distributions!) Such translation approaches are unlikely to yield meaningful assessments when using the SP 800-90B estimators, as consecutive raw data symbols may have been drawn from completely different sub-distributions, each of which may have quite different behavior.
+3. Even the relatively simple memory I/O timing used by the primary noise source in the new JEnt behavior can resolve in a number of ways (predominantly L1 cache, L2 cache, L3 cache, and RAM I/O), each with their own sub-distribution.  In the updated JEnt behavior we are able to identify the specific sub-distribution that we are interested in and configure the noise source so that it only outputs values from this sub-distribution.  Once we have this relatively simpler timing distribution, health testing becomes dramatically more powerful and statistical assessment becomes dramatically more meaningful.  This approach may also reduce the need for data translation: in the [Worked Examples](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/README.md), no translation was required to reduce the symbol size. With the base JEnt behavior the tester is directed to analyze the lower byte of the data, essentially superimposing possibly dozens of distinct sub-distributions (each of which resulted from the timing differences experienced during different sets of events, each with their own associated timing distributions!) Such translation approaches are unlikely to yield meaningful assessments when using the SP 800-90B estimators, as consecutive raw data symbols may have been drawn from completely different sub-distributions, each of which may have quite different behavior.
 
-4. The new JEnt behavior is much more conservative than can be configured in the base JEnt package. In the Worked Example, the setting `JENT_MEMORY_DEPTH_EXP = 11` leads to outputting one raw noise sample from the primary noise source per 3071.5 raw symbols sampled (on average), and for the Worked Example the entropy analysis supports the notion that there are 3.5 bits of min entropy per decimated output. This suggests that an undecimated data stream could instead be used so long as 
+4. The new JEnt behavior supports much more conservative than can be configured in the base JEnt package. As an example, in the "Essentially IID" Worked Example, the setting `JENT_MEMORY_DEPTH_EXP = 11` leads to outputting one raw noise sample from the primary noise source per 3071.5 raw symbols sampled (on average), and for this Worked Example the entropy analysis supports the notion that there are 4.2 bits of min entropy per decimated output. This suggests that an undecimated data stream could instead be used so long as 
 	
-	$$osr \geq \left\lceil \frac{3071.5}{3.5} \right\rceil = 878$$
+	$$osr \geq \left\lceil \frac{3071.5}{4.2} \right\rceil = 732$$
 	
-	(as the Worked Example analysis supports an average claim of 1 bit of min entropy per 878 undecimated raw symbols).  The base JEnt library does not support `osr` settings greater than 20.
+	(as the Worked Example analysis supports an average claim of 1 bit of min entropy per 732 undecimated raw symbols).  The base JEnt library does not support `osr` settings greater than 20.
 
 5. The new JEnt behavior provides a library that is **at least as good** as the base JEnt behavior. The overall timing is still integrated into the conditioning function, it just isn't credited as providing entropy (it is considered output from an *additional noise source*). All data (including decimated data and data that is not from the identified sub-distribution) is similarly integrated as *supplemental data* provided to the conditioning function, but not credited as providing any entropy.
 
@@ -31,7 +31,7 @@ over the base JEnt behavior.
 	
 	In the new JEnt behavior we have tried to limit the behavior that we are characterizing so that it is as much as possible established only by RAM I/O timings, a characteristic that has been observed as being unpredictable in many systems. Conversely, the raw data output from the base JEnt library is impacted by a wide variety of higher-level emergent timing behaviors, any of which could become dominant, and any of which may ultimately be more predictable than anticipated for a suitably well-informed active attacker.
 
-We encourage anyone interested in this approach to review [Worked Example](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/README.md).
+We encourage anyone interested in this approach to review [Worked Examples](https://github.com/joshuaehill/jitterentropy-library/blob/MemOnly/tests/raw-entropy/README.md).
 
 ## Pull Request Changes
 1. Noise source:
@@ -62,7 +62,7 @@ We encourage anyone interested in this approach to review [Worked Example](https
 		- Cause `jent_cache_size()` to return the cache size, rather than `jent_cache_size_roundup`, which returned the nearest power of 2 above the cache size.
 		- By default (in the absence of guidance in flags or a compiled-in macro) allocate approximately 8*cache_size for the jent_memaccess() noise source.
 			- This size forces most memory updates to resolve to RAM I/O.
-			- This is consistent with the Worked Example presented.
+			- This is consistent with the Worked Examples presented.
 2. Conditioning:
 	- Make it more clear what data is primary noise source output vs additional noise source output vs supplemental data.
 	- Split `jent_hash_time()` into two functions
@@ -86,5 +86,5 @@ We encourage anyone interested in this approach to review [Worked Example](https
 		- Print configuration and performance information.
 	- Added a few scripts for testing.
 5. Documentation:
-	- Update testing/raw-entropy/README.md to provide a detailed rationale and assessment Worked Example.
+	- Update testing/raw-entropy/README.md to provide a detailed rationale and assessment Worked Examples.
 
