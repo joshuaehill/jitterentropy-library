@@ -172,7 +172,7 @@ If the impact of past outputs is significant in future outputs, then
 any histogram is possible while simultaneously having vanishingly small
 entropy levels.
 
-**Step 4**: Configure the `analyze_depth.sh` tool by inputting the
+- **Step 4**: Configure the `analyze_depth.sh` tool by inputting the
 selected `JENT_MEMORY_SIZE_EXP`, `JENT_DISTRIBUTION_MIN` and
 `JENT_DISTRIBUTION_MAX` settings, and run this script to help
 estimate the statistical memory depth of the system. The timing
@@ -493,7 +493,7 @@ RAM I/O variation has a non-deterministic component.
 For **Assumption 2**: We rely on the hope that the complete set of SP
 800-90B estimators (i.e., the non-IID track result) provides a reasonable
 lower bound for the min entropy produced by the noise source when all
-data is taken from a single selected sub-distribution.  In this analysis approach,
+data is taken from a single selected sub-distribution. In this analysis approach,
 we have reduced
 the data to include only the output of a single selected sub-distribution, with the
 intent of removing any over crediting due to the contributions of other sub-distributions.
