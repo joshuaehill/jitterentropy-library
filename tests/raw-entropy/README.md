@@ -181,6 +181,8 @@ If the impact of past outputs is significant in future outputs, then
 any histogram is possible while simultaneously having vanishingly small
 entropy levels.
 
+In addition to the three steps defined for Selection of a Sub-Distribution, perform the following step:
+
 - **Step 4**: Configure the `analyze_depth.sh` tool by inputting the
 selected `JENT_MEMORY_SIZE_EXP`, `JENT_DISTRIBUTION_MIN` and
 `JENT_DISTRIBUTION_MAX` settings, and run this script to help
@@ -305,7 +307,7 @@ a much more efficient noise source.
 
 In this analysis approach, a combination of the `JENT_MEMORY_SIZE_EXP`,
 `JENT_DISTRIBUTION_MIN`, and `JENT_DISTRIBUTION_MAX` parameters with
-the desired properties (see above) should be used to configure the
+the desired values (see above) should be used to configure the
 library. `JENT_MEMORY_DEPTH_EXP` can be freely set (the value 0 would
 be acceptable in this analysis approach, and is the most efficient setting.)
 
@@ -393,7 +395,7 @@ The test system has a very complicated architecture, with many sources of
 variation in execution time. Here we describe known sources of timing variation, which of these is being credited, and how the non-credited sources of timing variation are controlled in testing:
 - Pipelining: The test code uses the `rdtscp` and `lfence` instructions to obtain the TSC value to reduce pipelining effects.
 - Branch prediction: As `JENT_MEMORY_DEPTH_EXP` gets larger, the branch prediction will become more consistent.
-- Frequency scaling: the hardware is effectively cooled and otherwise quiescent, so thermal throttling is kept to a minimum. Throttling for the purpose of power saving has been disabled through configuration.
+- Frequency scaling: The hardware is effectively cooled and otherwise quiescent, so thermal throttling is kept to a minimum. Throttling for the purpose of power saving has been disabled through configuration.
 - Context switching: The entire selected sub-distribution is much too low to include a context switch.
 - Hardware interrupts: The entire selected sub-distribution is much too low to include results where the running core serviced a hardware interrupt.
 - Executing on a different core: The test process was locked to a single core.
@@ -403,7 +405,7 @@ variation in execution time. Here we describe known sources of timing variation,
 - RAM I/O delay: This variation is included in the assessed distribution.
 
 ## Selecting a Sub-Distribution
-For step #1, the `analyze_memsize.sh` script was used to generate
+For Step #1, the `analyze_memsize.sh` script was used to generate
 (non-decimated) data for settings between 10 and 30.
 
 For Step #2, the following histograms were generated:
@@ -428,7 +430,7 @@ for non-decimated data:
 
 In this diagram, we see a couple of spikes in the [50, 100] interval,
 associated data being cached in the L3 cache. We are interested in
-results that result in RAM IO, so we are interested in the next two
+results that result in RAM I/O, so we are interested in the next two
 (dominant) spikes in the interval [105, 185]. As such, for Step 3,
 the distribution that we are interested in is in the interval [105, 185].
 
@@ -515,8 +517,8 @@ Original JEnt Analysis Approach, but it still relies on the SP 800-90B
 min entropy estimators to produce a conservative lower bound.
 
 ### Results
-Due to the sub-distribution selection, the produced data can be directly represented as 8-bit values.
-A sample of 147 million (non-decimated) samples were assessed using the non-IID track.
+Due to the sub-distribution selection (recall `JENT_DISTRIBUTION_MIN = 105`, and `JENT_DISTRIBUTION_MAX = 185`), the produced data can be directly represented as 8-bit values.
+A sample of 147 million non-decimated samples (`JENT_MEMORY_DEPTH_EXP = 0`) were assessed using the non-IID track.
 The results from the SP 800-90B non-IID statistical entropy estimation track
 (`ea_noniid`, when using two verbose flags) is as follows:
 
@@ -581,7 +583,7 @@ a particular min entropy lower bound (but at the cost of a performance reduction
 sub-distribution simplifications and the testing setup to provide a
 distribution that is so simple that we expect that its min entropy can
 be accurately assessed by the SP 800-90B min entropy estimators.
-- The base *JEnt Analysis Approach* presumes that the a more
+- The original *JEnt Analysis Approach* presumes that the a more
 complicated distribution of the timing of both the memory
 update (of a much smaller memory region that may predominantly resolve
 to cache hits) and a large conditioning step can be empirically assessed
