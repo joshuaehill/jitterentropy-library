@@ -26,7 +26,8 @@ to separately estimate a heuristic lower bound for the entropy.
 # Analysis Approaches to Justify a Particular Heuristic Entropy Estimate
 
 In general, it is difficult to produce a stochastic model for non-physical
-noise sources that applies across different hardware.
+noise sources, and if such a model were constructed it would apply only
+to a very specific instantiating of the non-physical source.
 
 Software noise sources that are based on variations of system timings
 commonly display timing distributions that are markedly multi-modal;
@@ -98,16 +99,18 @@ non-IID track's result provides a reasonable min entropy lower bound
 for the noise source and does not over-credit the min entropy due to
 variation that is essentially deterministic in its origin.
 
-> **JEH Note**: It isn't clear how to demonstrate that the estimators provide a reasonable lower bound for the source min entropy.
+The estimators vary in complexity and response to the data, so it isn't
+clear how to demonstrate that the estimators provide a reasonable lower
+bound for the source min entropy.
 
 
-## A Procedure Shared by the New Analysis Approaches: Selection of a Sub-Distribution
+## Noise Source Changes to Help Ease Analysis
 The SP 800-90B entropy estimators are often capable of producing
 meaningful min entropy bounds for single reasonably stable distributions,
 but they are likely to (sometimes dramatically) overestimate the available
 min entropy when they are provided data from a progression of distinct
-sub-distributions, even when output from these sub-distributions
-are output in a completely deterministic fashion. If a noise source
+sub-distributions, even when the selection of the sub-distributions
+is made in a completely deterministic fashion. If a noise source
 essentially behaves in one of `n` distinct ways, then it is commonly
 more meaningful to assess each of the possible `n` sub-distributions,
 as the *overall* assessment of all the data (inclusive of all the
@@ -117,9 +120,10 @@ attacker to affect the relative proportion in which each of the observed
 sub-distributions occur, and so can affect the amount of uncertainty
 that the system can produce.
 
-Both of the analysis approaches described here attempt to narrow the scope of the
-entropy estimation to a specific observed sub-distribution. This occurs
-using the following steps:
+Both of the analysis approaches described here attempt to make it more
+likely that the SP 800-90B estimators produce meaningful results by
+narrowing the scope of the entropy estimation to a specific observed
+sub-distribution. This occurs using the following steps:
 1. Use the `analyze_memsize.sh` script to generate (non-decimated)
 data samples for a wide variety of memory sizes.
 2. Create and examine raw data histograms for noise source outputs across
@@ -148,11 +152,16 @@ selected sub-distribution includes less than 10% of the observed values,
 then the distribution health test must be adjusted) and suitably broad to
 support a reasonable entropy level. This sub-distribution is provided
 by setting the `JENT_DISTRIBUTION_MIN` and `JENT_DISTRIBUTION_MAX`
-macros.
+macros. This identified sub-distribution should be the result of some
+readily identifiable architectural characteristic of the underlying
+hardware that is thought to be non-deterministic.
 
-The result of this configuration is that the noise source outputs
-only values within the expected sub-distribution range, so only this
-reduced data set needs to be able to be reasonably assessed.
+The result of this configuration is that the noise source outputs only
+values within the expected sub-distribution range, so only this reduced
+data set needs to be able to be reasonably assessed. In many instances the
+data from the selected sub-distribution can be used without translation,
+so there is no risk that translation masks patterns from statistical
+assessment.
 
 This makes any use of min entropy estimators more meaningful, and further
 should make the included health testing more statistically powerful.
@@ -189,19 +198,19 @@ A passing combination of the `JENT_MEMORY_SIZE_EXP`, `JENT_DISTRIBUTION_MIN`,
 used to configure the library.
 
 As a formal matter within the SP 800-90B evaluation, we won't make an
-IID claim; with the found configuration, the system empirically behaves
+IID claim; with parameters as selected above, the system empirically behaves
 in a way that is consistent with an IID system, but it is difficult to
 justify why the hardware design yields this result without a thorough
 and design-specific review of the hardware implementation.
 
 ### Statistically Meaningful Large Scale IID Testing
 A single test result from the NIST SP 800-90B IID tests is not meaningful
-for this testing, but it would be reasonable to instead test many data
-sets in this way. For each of the 22 IID tests (e.g., Excursion Test
-Statistic, Chi-Square Independence test, etc.), the result of repeated
-testing using disjoint data subsets can be viewed as “passing”
-so long as the proportion of that test passing is larger than some
-pre-determined cutoff.
+for this testing, but a reasonable statistical test can be constructed
+by testing many data sets in this way. For each of the 22 IID tests
+(e.g., Excursion Test Statistic, Chi-Square Independence test, etc.),
+the result of repeated testing using disjoint data subsets can be viewed
+as “passing” so long as the proportion of that test passing is larger
+than some pre-determined cutoff.
 
 In the SP 800-90B Section 5 IID tests, each IID test is designed to have
 a false reject rate of
@@ -236,7 +245,7 @@ or equivalently
 $$ q \leq 1 - 0.99^{1/22} \approx 0.000456729 \text{.}$$
 
 For this per-test cutoff and 147 tests, we find that we can tolerate up to
-3 failures on a per-test basis. (147 tests is the smallest number
+3 failures on a per-test basis (and 147 tests is the smallest number
 of tests that can tolerate 3 failures in this argument.) In this case, if
 4 or more failures are observed for any specific IID test then we conclude
 that the source is non-IID (that is, we reject the null hypothesis with
@@ -331,7 +340,10 @@ In this analysis approach, once the noise source is configured to produce
 a single identified sub-distribution, the SP 800-90B non-IID track can
 then be used to generate the heuristic min entropy estimate.
 
-> **JEH Note**: It isn't clear how to demonstrate that the estimators provide a reasonable lower bound for the source min entropy.
+The estimators vary in complexity and response to the data, so it isn't
+clear how to demonstrate that the estimators provide a reasonable lower
+bound for the source min entropy.
+
 
 # Worked Examples
 ## Test System
@@ -381,7 +393,7 @@ The test system has a very complicated architecture, with many sources of
 variation in execution time. Here we describe known sources of timing variation, which of these is being credited, and how the non-credited sources of timing variation are controlled in testing:
 - Pipelining: The test code uses the `rdtscp` and `lfence` instructions to obtain the TSC value to reduce pipelining effects.
 - Branch prediction: As `JENT_MEMORY_DEPTH_EXP` gets larger, the branch prediction will become more consistent.
-- Frequency scaling: the hardware is effectively cooled and otherwise quiescent, so thermal throttling is kept to a minimum. This throttling has been disabled through configuration.
+- Frequency scaling: the hardware is effectively cooled and otherwise quiescent, so thermal throttling is kept to a minimum. Throttling for the purpose of power saving has been disabled through configuration.
 - Context switching: The entire selected sub-distribution is much too low to include a context switch.
 - Hardware interrupts: The entire selected sub-distribution is much too low to include results where the running core serviced a hardware interrupt.
 - Executing on a different core: The test process was locked to a single core.
@@ -477,7 +489,7 @@ bits of min entropy per symbol.
 
 In the example above, the measurement shows that as much as 4.2 bits of
 entropy can be credited which implies that the available amount of entropy
-is more than what the Jitter RNG heuristic applies even when setting
+is more than what the Jitter RNG accounting requires, even when setting
 `osr` to the smallest possible value (`osr = 1`).
 
 ## The *Single Sub-Distribution Empirical* Analysis Approach Worked Example
@@ -490,8 +502,8 @@ non-deterministic; Intel has investigated this
 style of source run on a closely related architecture, and found that
 RAM I/O variation has a non-deterministic component.
 
-For **Assumption 2**: We rely on the hope that the complete set of SP
-800-90B estimators (i.e., the non-IID track result) provides a reasonable
+For **Assumption 2**: We rely on the complete set of SP
+800-90B estimators (i.e., the non-IID track result) to provide a reasonable
 lower bound for the min entropy produced by the noise source when all
 data is taken from a single selected sub-distribution. In this analysis approach,
 we have reduced
@@ -499,8 +511,8 @@ the data to include only the output of a single selected sub-distribution, with 
 intent of removing any over crediting due to the contributions of other sub-distributions.
 
 This assessment approach is considerably more conservative than in the
-Original JEnt Analysis Approach, but this doesn't mean that the produced
-assessment a conservative lower bound.
+Original JEnt Analysis Approach, but it still relies on the SP 800-90B
+min entropy estimators to produce a conservative lower bound.
 
 ### Results
 Due to the sub-distribution selection, the produced data can be directly represented as 8-bit values.
@@ -527,7 +539,7 @@ $$H_{\text{submitter}} \approx 3.4 \text{.}$$
 
 In the example above, the measurement shows that as much as 3.4 bits of
 entropy can be credited which implies that the available amount of entropy
-may be more than what the Jitter RNG heuristic applies even when setting
+is more than the Jitter RNG accounting requires even when setting
 `osr` to the smallest possible value (`osr = 1`).
 
 ## Commentary
@@ -590,10 +602,8 @@ indicates that there is a significant difference between the decimated
 and non-decimated data streams. This suggests that the non-decimated
 data may suffer from some statistical flaws that may not have been
 detected (and thus may not be fully accounted for) by the non-IID
-entropy estimators. This suggests that decimation helps prevent over
-crediting entropy in the system, and thus there is a technical reason
-for including the decimation beyond production of a defensible heuristic
-entropy estimate.
+entropy estimators. In this instance, the applied decimation helps prevent over
+crediting entropy in the system.
 
 # Authors
 Stephan Mueller <smueller@chronox.de>
