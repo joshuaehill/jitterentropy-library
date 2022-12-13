@@ -463,9 +463,9 @@ static inline void jent_notime_fini(void *ctx) { (void)ctx; }
 #define EMEM		12 /* Can't allocate memory for initialization */
 #define EGCD		13 /* GCD self-test failed */
 #define ETHREAD		14 /* Can't create thread for timer. */
-#define EAPT		14 /* APT error */
-#define ELAG		15 /* LAG error */
-#define EDIST		16 /* DIST error */
+#define EAPT		15 /* APT error */
+#define ELAG		16 /* LAG error */
+#define EDIST		17 /* DIST error */
 /* -- END error codes for init function -- */
 
 /* -- BEGIN error masks for health tests -- */
