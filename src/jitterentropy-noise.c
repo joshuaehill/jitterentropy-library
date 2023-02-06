@@ -132,7 +132,7 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time)
 	 * contributing at least 1/osr bits of min entropy.
 	 * If the health tests are not currently passing,  then this data is treated as not
 	 * contributing any min entropy.
-	 * If the data is outside of the expected distribution, this is treated as additional
+	 * If the data is outside of the expected distribution, this is treated as
 	 * "supplemental data", and is treated as not contributing any min entropy.
 	 */
 	sha3_update(ec->hash_state, (uint8_t *)&time, sizeof(time));
@@ -323,9 +323,10 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 
 		/*
 		 * Always include all the data, irrespective of its underlying distribution.
-		 * In the instance where the data is not the desired distribution, then then
-		 * data is considered supplemental information.
-		 * Call the additional noise sources which also runs the conditioning algorithm.
+		 * Only the last "current_delta" passed in is considered to be input from the
+		 * primary noise source; all prior "current_delta" values (including all data
+		 * that is not the desired distribution) is considered "supplemental data",
+		 * and is not credited with any entropy contribution.
 		 */
 		jent_hash_time(ec, current_delta);
 
@@ -336,7 +337,7 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 	} while (observed_symbols < separation);
 
 	/*
-	 * Integrate the additional noise source and supplemental information into the
+	 * Integrate the additional noise source and supplemental data into the
 	 * conditioning function.
 	 */
 	jent_hash_additional(ec);
