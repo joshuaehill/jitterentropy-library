@@ -199,6 +199,30 @@ struct rand_data
 #endif
 	#define JENT_DIST_WINDOW (1U<<JENT_DIST_WINDOW_EXP)
 	#define JENT_DIST_MASK (JENT_DIST_WINDOW-1)
+
+/*
+ * The JENT_DIST_DIAG macro controls some tracking logic that can be used to
+ * help diagnose distribution health test failures.
+ *
+ * preraw_history is a circular buffer that is used to keep the last
+ * JENT_DIST_WINDOW pre-raw samples.  When the distribution test runs,
+ * it finds the approximate 10th and 90th percentile for the current
+ * window. These values are outlying, but not extremely so, and are
+ * expected to be close to the identified JENT_DISTRIBUTION_MIN /
+ * JENT_DISTRIBUTION_MAX values.
+ *
+ * If the distribution test detects an error, these 10th/90th percentile
+ * values are separately saved in the preraw_lower_bound_error and
+ * preraw_upper_bound_error values. In all cases, the lowest and
+ * highest observed 10th/90th percentile values are saved in the
+ * preraw_lower_bound and preraw_upper_bound values.
+ *
+ * In order to understand an average case, an average of the 10th
+ * and 90th percentile values is also calculated in the
+ * preraw_lower_bound_average and preraw_upper_bound_average values.
+ *
+ */
+
 #ifdef JENT_DIST_DIAG
 	uint64_t preraw_history[JENT_DIST_WINDOW];
 	uint64_t preraw_lower_bound;

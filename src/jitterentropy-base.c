@@ -299,6 +299,9 @@ ssize_t jent_read_entropy_safe(struct rand_data **ec, char *data, size_t len)
 			 */
 			jent_entropy_collector_free(*ec);
 
+			/* Clear the pointer value so an allocation failure can be detected. */
+			*ec = NULL;
+
 			/* Perform new health test with updated OSR */
 			if (jent_entropy_init_ex(osr, flags))
 				return -1;
@@ -539,6 +542,8 @@ static struct rand_data
 err:
 	if (entropy_collector->mem != NULL)
 		jent_zfree((void *)entropy_collector->mem, JENT_MEMSIZE_EXP_TO_SIZE(memsize_exp));
+	if (entropy_collector->hash_state != NULL)
+		sha3_dealloc(entropy_collector->hash_state);
 	jent_zfree(entropy_collector, sizeof(struct rand_data));
 	return NULL;
 }
