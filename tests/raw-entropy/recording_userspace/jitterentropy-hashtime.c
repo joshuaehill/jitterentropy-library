@@ -54,7 +54,7 @@
 static int jent_one_test(const char *pathname, unsigned long rounds,
 			 unsigned int flags, int report_counter_ticks)
 {
-	unsigned long size = 0;
+	long size = 0;
 	struct rand_data *ec = NULL;
 	FILE *out_file = NULL;
 	DATATYPE *duration;
@@ -80,6 +80,7 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 	}
 	ec = jent_entropy_collector_alloc(0, flags);
 	if (!ec) {
+		fprintf(stderr, "Allocation was not successful.\n");
 		ret = 1;
 		goto out;
 	}
@@ -105,17 +106,19 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 
 	/* Prime the test */
 	jent_measure_jitter(ec, NULL);
-	for (size = 0; size < rounds; size++) {
+	for (size = 0; (size < (long) rounds) && !jent_health_failure(ec); size++) {
 		/* Disregard stuck indicator */
 		uint64_t rawdata;
-		jent_measure_jitter(ec, &rawdata);
-		assert(rawdata >= JENT_DISTRIBUTION_MIN);
-		duration[size] = (DATATYPE)(rawdata - JENT_DISTRIBUTION_MIN);
-	}
-
-	if(fwrite(duration, sizeof(DATATYPE), rounds, out_file) != rounds) {
-		ret = 1;
-		goto out;
+		unsigned int stuck;
+		stuck = jent_measure_jitter(ec, &rawdata);
+		if(stuck < 2) {
+			/* This value is within the expected sub-distribution. */
+			assert(rawdata >= JENT_DISTRIBUTION_MIN);
+			duration[size] = (DATATYPE)(rawdata - JENT_DISTRIBUTION_MIN);
+		} else {
+			/* This value is NOT within the expected sub-distribution. */
+			size--;
+		}
 	}
 
 	if ((health_test_result = jent_health_failure(ec))) {
@@ -123,14 +126,32 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		if (health_test_result & JENT_RCT_FAILURE) fprintf(stderr, " RCT");
 		if (health_test_result & JENT_APT_FAILURE) fprintf(stderr, " APT");
 		if (health_test_result & JENT_LAG_FAILURE) fprintf(stderr, " Lag");
-		if (health_test_result & JENT_DIST_FAILURE) fprintf(stderr, " Dist");
+		if (health_test_result & JENT_DIST_FAILURE) {
+			fprintf(stderr, " Dist");
+#ifdef JENT_DIST_DIAG
+			fprintf(stderr, " error bounds (%zu, %zu)", ec->preraw_lower_bound_error, ec->preraw_upper_bound_error);
+#endif
+		}
 		fprintf(stderr, "\n");
 	}
 
-	uint64_t dist_count = ec->in_dist_count_history + ec->current_in_dist_count;
-	uint64_t total_count = ec->data_count_history + ec->current_data_count;
-	if(total_count > 0) {
-		fprintf(stderr, "%zu / %zu (%g %%) samples in reference distribution\n", dist_count, total_count, 100.0 * (double)dist_count/((double)total_count));
+#ifdef JENT_DIST_DIAG
+	fprintf(stderr, "dist bounds: (%zu, %zu) ave: (%g, %g)\n", ec->preraw_lower_bound, ec->preraw_upper_bound, ec->preraw_lower_bound_average, ec->preraw_upper_bound_average);
+#endif
+	{
+		uint64_t dist_count = ec->in_dist_count_history + ec->current_in_dist_count;
+		uint64_t total_count = ec->data_count_history + ec->current_data_count;
+		if(total_count > 0) {
+			fprintf(stderr, "%zu / %zu (%g %%) samples in reference distribution\n", dist_count, total_count, 100.0 * (double)dist_count/((double)total_count));
+		}
+	}
+
+	assert(size <= (long)rounds);
+	assert(size >= 0);
+
+	if(fwrite(duration, sizeof(DATATYPE), (unsigned)size, out_file) != (size_t)size) {
+		ret = 1;
+		goto out;
 	}
 
 out:
@@ -160,7 +181,7 @@ out:
 int main(int argc, char * argv[])
 {
 	unsigned long i, rounds, repeats;
-	unsigned int flags = 0;
+	unsigned int flags = JENT_FORCE_FIPS;
 	int ret;
 	char pathname[4096];
 

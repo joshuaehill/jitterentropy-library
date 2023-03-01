@@ -3,7 +3,8 @@
 CC ?= gcc
 CFLAGS +=-Wextra -Wall -pedantic -fPIC -O0
 #Hardening
-CFLAGS +=-fwrapv --param ssp-buffer-size=4 -fvisibility=hidden -fPIE -Wcast-align -Wmissing-field-initializers -Wshadow -Wswitch-enum
+CFLAGS +=-fwrapv --param ssp-buffer-size=4 -fvisibility=hidden -fPIE -Wcast-align -Wmissing-field-initializers -Wshadow -Wswitch-enum -Wno-type-limits
+CFLAGS +=-DJENT_DIST_DIAG -DJENT_DIST_WINDOW_EXP=16
 #CFLAGS += -g -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls
 LDFLAGS +=-Wl,-z,relro,-z,now
 #LDFLAGS +=--fsanitize=address

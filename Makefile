@@ -8,7 +8,7 @@ CFLAGS +=-Wextra -Wall -pedantic -fPIC -O0 -fwrapv -Wconversion -Wno-type-limits
 LDFLAGS +=-Wl,-z,relro,-z,now -lpthread
 
 # Enable internal timer support
-CFLAGS += -DJENT_CONF_ENABLE_INTERNAL_TIMER
+CFLAGS += -DJENT_DIST_DIAG -DJENT_DIST_WINDOW_EXP=16
 
 GCCVERSIONFORMAT := $(shell echo `$(CC) -dumpversion | sed 's/\./\n/g' | wc -l`)
 ifeq "$(GCCVERSIONFORMAT)" "3"

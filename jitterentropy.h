@@ -191,8 +191,24 @@ struct rand_data
 
 	uint64_t distribution_min;	/* The smallest value considered to be in the targeted sub-distribution. */
 	uint64_t distribution_max;	/* The largest value considered to be in the targeted sub-distribution. */
-
-	#define JENT_DIST_WINDOW 10000U
+        /*
+         * The amount of pre-raw data is 2^JENT_DIST_WINDOW_EXP.
+         */
+#ifndef JENT_DIST_WINDOW_EXP
+	#define JENT_DIST_WINDOW_EXP 14
+#endif
+	#define JENT_DIST_WINDOW (1U<<JENT_DIST_WINDOW_EXP)
+	#define JENT_DIST_MASK (JENT_DIST_WINDOW-1)
+#ifdef JENT_DIST_DIAG
+	uint64_t preraw_history[JENT_DIST_WINDOW];
+	uint64_t preraw_lower_bound;
+	uint64_t preraw_lower_bound_error;
+	double preraw_lower_bound_average;
+	uint64_t preraw_upper_bound;
+	uint64_t preraw_upper_bound_error;
+	double preraw_upper_bound_average;
+	uint64_t dist_window_count;
+#endif
 	uint64_t current_data_count;	/* The total number of timing values that have been observed. */
 	uint64_t current_in_dist_count;	/*The total number of timing values within the expected distribution.*/
 	uint64_t data_count_history;	/* The total number of timing values that have been observed. */
@@ -358,20 +374,6 @@ struct rand_data
  * It is allowed to change this value as required for the intended environment.
  */
 #define JENT_STUCK_INIT_THRES(x) ((x*9) / 10)
-#endif
-
-#ifndef JENT_DIST_RUNNING_THRES
-/*
- * By default, at least 10% of all measurements
- * are expected to be in the expected distribution.
- * This is structured to round down (until there are at least 10000
- * observations, the cutoff is rounded down to 0).
- * Under a binomial assumption, InverseCDF[Binomial[10000, 0.10], 2^-40] = 795,
- * so we use that as our cutoff.
- *
- * It is allowed to change this value as required for the intended environment.
- */
-#define JENT_DIST_RUNNING_THRES(x) (((x) / 10000)*795)
 #endif
 
 #ifdef JENT_PRIVATE_COMPILE

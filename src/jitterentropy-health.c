@@ -36,6 +36,34 @@ int jent_set_fips_failure_callback_internal(jent_fips_failure_cb cb)
 	fips_cb = cb;
 	return 0;
 }
+/*
+ * We target at least 80% of all observations being in the selected distribution,
+ * but this may degrade somewhat in a properly functioning entropy source, due to
+ * differences in the mix of activities of the device. As such, we allow this rate
+ * to fall to 10% of all measurements in the expected distribution.
+ *
+ * The distribution health test operates on at least JENT_DIST_WINDOW observations,
+ * but it may be more than this. This logic is structured to round down (until
+ * there are at least JENT_DIST_WINDOW observations, the cutoff is rounded down to 0).
+ * Under a binomial assumption this can be calculated using the following:
+ * InverseCDF[BinomialDistribution[JENT_DIST_WINDOW, 1/10], 2^-40]
+ *
+ * The global cutoffs are calculated using various exponents, starting at 2^9
+ * and proceeding to 2^20. The JENT_DIST_WINDOW_EXP should be in this range.
+ * Smaller values (JENT_DIST_WINDOW_EXP<=8) result in a test that cannot fail,
+ * and larger values delay a possible failure unreasonably in most patterns of use.
+ *
+ * This table provides these cutoffs (out of JENT_DIST_WINDOW), from
+ * JENT_DIST_WINDOW_EXP=9 to JENT_DIST_WINDOW_EXP=20.
+ */
+
+#if (JENT_DIST_WINDOW_EXP < 9) || (JENT_DIST_WINDOW_EXP>20)
+#error "JENT_DIST_WINDOW_EXP must be between 9 and 20."
+#endif
+static const uint64_t jent_dist_cutoff_lookup[12] =
+        {11, 42, 116, 281, 635, 1374, 2901, 6019, 12348, 25138, 50904, 102699};
+
+#define JENT_DIST_RUNNING_THRES(x) (((x) >> JENT_DIST_WINDOW_EXP)*jent_dist_cutoff_lookup[JENT_DIST_WINDOW_EXP-9])
 
 void jent_dist_init(struct rand_data *ec)
 {
@@ -43,6 +71,15 @@ void jent_dist_init(struct rand_data *ec)
 	ec->current_in_dist_count = 0;
 	ec->data_count_history = 0;
 	ec->in_dist_count_history = 0;
+#ifdef JENT_DIST_DIAG
+	ec->preraw_lower_bound = UINT64_MAX;
+	ec->preraw_lower_bound_error = UINT64_MAX;
+	ec->preraw_lower_bound_average=0.0;
+	ec->preraw_upper_bound = 0;
+	ec->preraw_upper_bound_error = 0;
+	ec->preraw_upper_bound_average=0.0;
+	ec->dist_window_count = 0;
+#endif
 }
 
 /**
@@ -59,6 +96,18 @@ static void jent_dist_reset(struct rand_data *ec)
 	ec->current_data_count = 0;
 }
 
+#ifdef JENT_DIST_DIAG
+int u64comp(const void* a, const void* b)
+{
+    uint64_t arg1 = *(const uint64_t*)a;
+    uint64_t arg2 = *(const uint64_t*)b;
+
+    if (arg1 < arg2) return -1;
+    if (arg1 > arg2) return 1;
+    return 0;
+}
+#endif
+
 /**
  * The current result of the dist test
  *
@@ -71,8 +120,35 @@ void jent_dist_test(struct rand_data *ec)
 	 * too often, trigger a health test failure.
 	 */
 	if(ec->current_data_count >= JENT_DIST_WINDOW) {
-		if(JENT_DIST_RUNNING_THRES(ec->current_data_count) > ec->current_in_dist_count)
+#ifdef JENT_DIST_DIAG
+		uint64_t cur_preraw_lb, cur_preraw_ub;
+		ec->dist_window_count++;
+		/*Find the middle 80% of the distribution.*/
+		qsort(ec->preraw_history, JENT_DIST_WINDOW, sizeof(uint64_t), u64comp);
+		cur_preraw_lb = ec->preraw_history[(JENT_DIST_WINDOW*1)/10];
+		cur_preraw_ub = ec->preraw_history[(JENT_DIST_WINDOW*9)/10];
+
+		/* Update the bounds. */
+		if(cur_preraw_lb < ec->preraw_lower_bound) ec->preraw_lower_bound = cur_preraw_lb;
+		if(cur_preraw_ub > ec->preraw_upper_bound) ec->preraw_upper_bound = cur_preraw_ub;
+
+		/* Update the averages. */
+		/* Note that x-bar_n 	= 1/n sum(x_j, j=1..n)
+		 *			= 1/n ( sum(x_j, j=1..n-1) + x_n )
+		 *			= 1/n ( (n-1) * x-bar_(n-1) + x_n )
+		 *			= 1/n ( n*x-bar_(n-1) - x-bar_(n-1) + x_n )
+		 *			= x-bar_(n-1) + 1/n ( x_n - x-bar_(n-1) )
+		 */
+		ec->preraw_lower_bound_average = ec->preraw_lower_bound_average + ((double)cur_preraw_lb - ec->preraw_lower_bound_average)/((double)ec->dist_window_count);
+		ec->preraw_upper_bound_average = ec->preraw_upper_bound_average + ((double)cur_preraw_ub - ec->preraw_upper_bound_average)/((double)ec->dist_window_count);
+#endif
+		if(JENT_DIST_RUNNING_THRES(ec->current_data_count) > ec->current_in_dist_count) {
 			ec->health_failure |= JENT_DIST_FAILURE;
+#ifdef JENT_DIST_DIAG
+			ec->preraw_lower_bound_error = cur_preraw_lb;
+			ec->preraw_upper_bound_error = cur_preraw_ub;
+#endif
+		}
 
 		jent_dist_reset(ec);
 	}
@@ -86,6 +162,11 @@ void jent_dist_test(struct rand_data *ec)
  */
 unsigned int jent_dist_insert(struct rand_data *ec, uint64_t current_delta)
 {
+#ifdef JENT_DIST_DIAG
+        /* Save the pre-raw history in a circular buffer. */
+	ec->preraw_history[(ec->current_data_count) & JENT_DIST_MASK] = current_delta;
+#endif
+
 	ec->current_data_count++;
 	/* Is this in the reference distribution? */
 	if((current_delta >= ec->distribution_min) && (current_delta <= ec->distribution_max)) {
@@ -478,7 +559,6 @@ unsigned int jent_stuck(struct rand_data *ec, uint64_t current_delta)
 	 */
 	jent_apt_insert(ec, current_delta);
 	jent_lag_insert(ec, current_delta);
-	jent_dist_test(ec);
 
 	if (!current_delta || !delta2 || !delta3) {
 		/* RCT with a stuck bit */

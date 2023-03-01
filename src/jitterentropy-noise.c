@@ -314,12 +314,14 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 	unsigned int stuck;
 	uint64_t separation;
 	uint64_t observed_symbols=0;
+	uint64_t preraw_per_symbol=0;
 
 	separation = jent_loop_shuffle(ec, JENT_MEMORY_DEPTH_EXP, JENT_MEMORY_DEPTH_EXP);
 
 	do {
 		/* Invoke the primary noise source (the memory access noise source)*/
 		current_delta = jent_memaccess(ec);
+		preraw_per_symbol++;
 
 		/*
 		 * Always include all the data, irrespective of its underlying distribution.
@@ -331,10 +333,14 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 		jent_hash_time(ec, current_delta);
 
 		/*The distribution test will tell us if this is the desired sub-distribution.*/
-		if(jent_dist_insert(ec, current_delta))
+		if(jent_dist_insert(ec, current_delta)) {
 			observed_symbols++;
+			preraw_per_symbol = 0;
+		}
+	} while ((observed_symbols < separation) && (preraw_per_symbol < JENT_DIST_WINDOW));
 
-	} while (observed_symbols < separation);
+	/*Test the pre-raw data in all cases.*/
+	jent_dist_test(ec);
 
 	/*
 	 * Integrate the additional noise source and supplemental data into the
@@ -342,18 +348,23 @@ unsigned int jent_measure_jitter(struct rand_data *ec,
 	 */
 	jent_hash_additional(ec);
 
-	/*
-	 * This is in the identified distribution that we are looking for,
-	 * and we have the desired separation from the prior sample, so is formally a noise
-	 * source output. Perform health testing.
-	 */
-	stuck = jent_stuck(ec, current_delta);
+	if(observed_symbols >= separation) {
+		/*
+		 * This is in the identified distribution that we are looking for,
+		 * and we have the desired separation from the prior sample, so is formally a noise
+		 * source output. Perform health testing.
+		 */
+		stuck = jent_stuck(ec, current_delta);
 
-	/* return the raw entropy value */
-	if (ret_current_delta)
-		*ret_current_delta = current_delta;
+		/* return the raw entropy value */
+		if (ret_current_delta)
+			*ret_current_delta = current_delta;
 
-	return stuck;
+		return stuck;
+	} else {
+		/* This is not in the specified sub-distribution. Inform the caller. */
+		return 2;
+	}
 }
 
 /**
