@@ -84,7 +84,7 @@ extern "C" {
 
 /*
  * The output 256 bits can receive more than 256 bits of min entropy,
- * of course, but the 256-bit output of SHA3-256(M) can only asymptotically
+ * of course, but the 256-bit output of SHA3-256 can only asymptotically
  * approach 256 bits of min entropy, not attain that bound. Random maps will
  * tend to have output collisions, which reduces the creditable output entropy
  * (that is what SP 800-90B Section 3.1.5.1.2 attempts to bound).
@@ -104,7 +104,7 @@ extern "C" {
  * The external caller provides these function pointers to handle the
  * management of the timer thread that is spawned by the Jitter RNG.
  *
- * @var jent_notime_init This function is intended to initialze the threading
+ * @var jent_notime_init This function is intended to initialize the threading
  *	support. All data that is required by the threading code must be
  *	held in the data structure @param ctx. The Jitter RNG maintains the
  *	data structure and uses it for every invocation of the following calls.
@@ -200,6 +200,17 @@ struct rand_data
 	#define JENT_DIST_WINDOW (1U<<JENT_DIST_WINDOW_EXP)
 	#define JENT_DIST_MASK (JENT_DIST_WINDOW-1)
 
+/* When a run of JENT_DIST_FAILURE_CUTOFF distribution failures occur, flag a persistent error. */
+#ifndef JENT_DIST_FAILURE_CUTOFF
+	#define JENT_DIST_FAILURE_CUTOFF 10
+#endif
+
+/* The cutoff proportion for the proportion of data in the identified sub-distribution. */
+/* The code includes cutoffs for 10 percent, 5 percent, 2 percent, and 1 percent cutoffs. */
+#ifndef JENT_DIST_CUTOFF_PERCENT
+#define JENT_DIST_CUTOFF_PERCENT 10
+#endif
+
 /*
  * The JENT_DIST_DIAG macro controls some tracking logic that can be used to
  * help diagnose distribution health test failures.
@@ -237,6 +248,8 @@ struct rand_data
 	uint64_t current_in_dist_count;	/*The total number of timing values within the expected distribution.*/
 	uint64_t data_count_history;	/* The total number of timing values that have been observed. */
 	uint64_t in_dist_count_history;	/*The total number of timing values within the expected distribution.*/
+	uint32_t dist_failure_run;		/* The number of consecutive failures of the distribution health test. */
+	uint32_t dist_failure_run_cutoff;	/* The number of distribution health test failures that constitute a persistent failure. */
 
 	/* Repetition Count Test */
 	int rct_count;			/* Number of stuck values */

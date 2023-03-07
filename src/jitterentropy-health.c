@@ -40,30 +40,60 @@ int jent_set_fips_failure_callback_internal(jent_fips_failure_cb cb)
  * We target at least 80% of all observations being in the selected distribution,
  * but this may degrade somewhat in a properly functioning entropy source, due to
  * differences in the mix of activities of the device. As such, we allow this rate
- * to fall to 10% of all measurements in the expected distribution.
+ * to fall to some lower (but non-zero) proportion of all measurements.
  *
  * The distribution health test operates on at least JENT_DIST_WINDOW observations,
  * but it may be more than this. This logic is structured to round down (until
  * there are at least JENT_DIST_WINDOW observations, the cutoff is rounded down to 0).
  * Under a binomial assumption this can be calculated using the following:
- * InverseCDF[BinomialDistribution[JENT_DIST_WINDOW, 1/10], 2^-40]
+ * InverseCDF[BinomialDistribution[JENT_DIST_WINDOW, p/100], 2^-40]
+ * where here "p" is the desired cutoff percentage.
  *
- * The global cutoffs are calculated using various exponents, starting at 2^9
- * and proceeding to 2^20. The JENT_DIST_WINDOW_EXP should be in this range.
- * Smaller values (JENT_DIST_WINDOW_EXP<=8) result in a test that cannot fail,
- * and larger values delay a possible failure unreasonably in most patterns of use.
- *
- * This table provides these cutoffs (out of JENT_DIST_WINDOW), from
- * JENT_DIST_WINDOW_EXP=9 to JENT_DIST_WINDOW_EXP=20.
+ * The global cutoffs are calculated using various exponents, starting at the smallest
+ * meaningful test, and proceeding to 2^20. The JENT_DIST_WINDOW_EXP should be in
+ * this range. Smaller values result in a test that cannot fail, and larger values
+ * delay a possible failure unreasonably in most patterns of use.
  */
 
-#if (JENT_DIST_WINDOW_EXP < 9) || (JENT_DIST_WINDOW_EXP>20)
-#error "JENT_DIST_WINDOW_EXP must be between 9 and 20."
-#endif
+#if JENT_DIST_CUTOFF_PERCENT == 10
+
+/* For a 10% cutoff. */
+#define JENT_DIST_CUTOFF_OFFSET 9
 static const uint64_t jent_dist_cutoff_lookup[12] =
         {11, 42, 116, 281, 635, 1374, 2901, 6019, 12348, 25138, 50904, 102699};
 
-#define JENT_DIST_RUNNING_THRES(x) (((x) >> JENT_DIST_WINDOW_EXP)*jent_dist_cutoff_lookup[JENT_DIST_WINDOW_EXP-9])
+#elif JENT_DIST_CUTOFF_PERCENT == 5
+
+/* For a 5% cutoff. */
+#define JENT_DIST_CUTOFF_OFFSET 10
+static const uint64_t jent_dist_cutoff_lookup[11] =
+        {10, 41, 114, 278, 630, 1368, 2891, 6005, 12328, 25110, 50863}
+
+#elif JENT_DIST_CUTOFF_PERCENT == 2
+
+/* For a 2% cutoff. */
+#define JENT_DIST_CUTOFF_OFFSET 11
+static const uint64_t jent_dist_cutoff_lookup[10] =
+        {5, 27, 83, 209, 485, 1066, 2272, 4746, 9779, 19969};
+
+#elif JENT_DIST_CUTOFF_PERCENT == 1
+
+/* For a 1% cutoff. */
+#define JENT_DIST_CUTOFF_OFFSET 12
+static const uint64_t jent_dist_cutoff_lookup[9] =
+        {5, 27, 83, 209, 484, 1065, 2270, 4743, 9776};
+
+#else
+
+#error "JENT_DIST_CUTOFF_PERCENT must be set to 10 or 5 or 2 or 1."
+
+#endif
+
+#if (JENT_DIST_WINDOW_EXP < JENT_DIST_CUTOFF_OFFSET) || (JENT_DIST_WINDOW_EXP>20)
+#error "JENT_DIST_WINDOW_EXP out of range."
+#endif
+
+#define JENT_DIST_RUNNING_THRES(x) (((x) >> JENT_DIST_WINDOW_EXP)*jent_dist_cutoff_lookup[JENT_DIST_WINDOW_EXP-JENT_DIST_CUTOFF_OFFSET])
 
 void jent_dist_init(struct rand_data *ec)
 {
@@ -71,6 +101,9 @@ void jent_dist_init(struct rand_data *ec)
 	ec->current_in_dist_count = 0;
 	ec->data_count_history = 0;
 	ec->in_dist_count_history = 0;
+	ec->dist_failure_run = 0;
+        ec->dist_failure_run_cutoff = JENT_DIST_FAILURE_CUTOFF;
+
 #ifdef JENT_DIST_DIAG
 	ec->preraw_lower_bound = UINT64_MAX;
 	ec->preraw_lower_bound_error = UINT64_MAX;
@@ -142,12 +175,20 @@ void jent_dist_test(struct rand_data *ec)
 		ec->preraw_lower_bound_average = ec->preraw_lower_bound_average + ((double)cur_preraw_lb - ec->preraw_lower_bound_average)/((double)ec->dist_window_count);
 		ec->preraw_upper_bound_average = ec->preraw_upper_bound_average + ((double)cur_preraw_ub - ec->preraw_upper_bound_average)/((double)ec->dist_window_count);
 #endif
+
+		/* Process the behavior if a failure condition is seen. */
 		if(JENT_DIST_RUNNING_THRES(ec->current_data_count) > ec->current_in_dist_count) {
-			ec->health_failure |= JENT_DIST_FAILURE;
+			ec->dist_failure_run++;
 #ifdef JENT_DIST_DIAG
 			ec->preraw_lower_bound_error = cur_preraw_lb;
 			ec->preraw_upper_bound_error = cur_preraw_ub;
 #endif
+			/* Check to see if the observed different behavior has been going for long enough to trigger a failure. */
+			if(ec->dist_failure_run >= ec->dist_failure_run_cutoff)
+				ec->health_failure |= JENT_DIST_FAILURE;
+		} else {
+			/* This window passed. Clear any distribution health test failure run. */
+			ec->dist_failure_run = 0;
 		}
 
 		jent_dist_reset(ec);

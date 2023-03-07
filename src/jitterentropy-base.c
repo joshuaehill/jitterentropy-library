@@ -299,7 +299,7 @@ ssize_t jent_read_entropy_safe(struct rand_data **ec, char *data, size_t len)
 			 */
 			jent_entropy_collector_free(*ec);
 
-			/* Clear the pointer value so an allocation failure can be detected. */
+			/* Clear the pointer value so a jent_entropy_init_ex failure won't leave a bad state. */
 			*ec = NULL;
 
 			/* Perform new health test with updated OSR */
