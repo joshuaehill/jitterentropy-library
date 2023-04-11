@@ -298,7 +298,6 @@ ssize_t jent_read_entropy_safe(struct rand_data **ec, char *data, size_t len)
 			 * memory size
 			 */
 			jent_entropy_collector_free(*ec);
-			*ec = NULL;
 
 			/* Clear the pointer value so a jent_entropy_init_ex failure won't leave a bad state. */
 			*ec = NULL;
