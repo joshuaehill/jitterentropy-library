@@ -88,7 +88,7 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 
 	fprintf(stderr, "Bytes of memory: 2^%u\n", ec->memsize_exp);
 	fprintf(stderr, "Memory depth: 2^%u\n", JENT_MEMORY_DEPTH_EXP);
-	fprintf(stderr, "gcd: %zu\n", ec->jent_common_timer_gcd);
+	fprintf(stderr, "gcd: %" PRIu64 "\n", ec->jent_common_timer_gcd);
 	fprintf(stderr, "dist health test failure run cutoff: %u\n", ec->dist_failure_run_cutoff);
 
 	if (!report_counter_ticks) {
@@ -127,7 +127,7 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 			if(dist_failure_count > 0) {
 				fprintf(stderr, "Transient distribution health test error %u of %u\n", ec->dist_failure_run, ec->dist_failure_run_cutoff);
 #ifdef JENT_DIST_DIAG
-				fprintf(stderr, "\tTest error bounds (%zu, %zu)\n", ec->preraw_lower_bound_error, ec->preraw_upper_bound_error);
+				fprintf(stderr, "\tTest error bounds (%" PRIu64 ", %" PRIu64 ")\n", ec->preraw_lower_bound_error, ec->preraw_upper_bound_error);
 				ec->preraw_lower_bound_error = UINT64_MAX;
 				ec->preraw_upper_bound_error = 0;
 #endif
@@ -143,20 +143,20 @@ static int jent_one_test(const char *pathname, unsigned long rounds,
 		if (health_test_result & JENT_DIST_FAILURE) {
 			fprintf(stderr, " Dist (failure run cutoff %u)", ec->dist_failure_run_cutoff);
 #ifdef JENT_DIST_DIAG
-			fprintf(stderr, " error bounds (%zu, %zu)", ec->preraw_lower_bound_error, ec->preraw_upper_bound_error);
+			fprintf(stderr, " error bounds (%" PRIu64 ", %" PRIu64 ")", ec->preraw_lower_bound_error, ec->preraw_upper_bound_error);
 #endif
 		}
 		fprintf(stderr, "\n");
 	} 
 
 #ifdef JENT_DIST_DIAG
-	fprintf(stderr, "dist bounds: (%zu, %zu) ave: (%g, %g)\n", ec->preraw_lower_bound, ec->preraw_upper_bound, ec->preraw_lower_bound_average, ec->preraw_upper_bound_average);
+	fprintf(stderr, "dist bounds: (%" PRIu64 ", %" PRIu64 ") ave: (%g, %g)\n", ec->preraw_lower_bound, ec->preraw_upper_bound, ec->preraw_lower_bound_average, ec->preraw_upper_bound_average);
 #endif
 	{
 		uint64_t dist_count = ec->in_dist_count_history + ec->current_in_dist_count;
 		uint64_t total_count = ec->data_count_history + ec->current_data_count;
 		if(total_count > 0) {
-			fprintf(stderr, "%zu / %zu (%g %%) samples in reference distribution\n", dist_count, total_count, 100.0 * (double)dist_count/((double)total_count));
+			fprintf(stderr, "%" PRIu64 " / %" PRIu64 " (%g %%) samples in reference distribution\n", dist_count, total_count, 100.0 * (double)dist_count/((double)total_count));
 		}
 	}
 
