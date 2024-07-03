@@ -97,12 +97,14 @@ static uint64_t jent_loop_shuffle(struct rand_data *ec,
  * Output:
  * updated hash context
  */
+
 static void jent_hash_time(struct rand_data *ec, uint64_t time,
 			   uint64_t loop_cnt, unsigned int stuck)
 {
 	HASH_CTX_ON_STACK(ctx);
-	uint8_t intermediary[SHA3_256_SIZE_DIGEST];
-	uint64_t j = 0;
+	/* Size of intermediary ensures a Keccak operation during hash_update */
+	uint8_t intermediary[SHA3_MAX_SIZE_BLOCK] = { 0 };
+	uint64_t j = 0, output_value;
 #define MAX_HASH_LOOP 3
 #define MIN_HASH_LOOP 0
 
@@ -111,8 +113,9 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time,
 	uint64_t hash_loop_cnt =
 		jent_loop_shuffle(ec, MAX_HASH_LOOP, MIN_HASH_LOOP);
 
-	/* Use the memset to shut up valgrind */
-	memset(intermediary, 0, sizeof(intermediary));
+	/* Ensure that everything will fit into the intermediary buffer. */
+	BUILD_BUG_ON(sizeof(intermediary) < (SHA3_256_SIZE_DIGEST +
+					     sizeof(uint64_t)));
 
 	sha3_256_init(&ctx);
 
@@ -137,7 +140,7 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time,
 	 * the sha3_final.
 	 */
 	for (j = 0; j < hash_loop_cnt; j++) {
-		sha3_update(&ctx, intermediary, sizeof(intermediary));
+		sha3_update(&ctx, intermediary, SHA3_256_SIZE_DIGEST);
 		sha3_update(&ctx, (uint8_t *)&ec->rct_count,
 			    sizeof(ec->rct_count));
 		sha3_update(&ctx, (uint8_t *)&ec->apt_cutoff,
@@ -153,22 +156,34 @@ static void jent_hash_time(struct rand_data *ec, uint64_t time,
 	}
 
 	/*
-	 * Inject the data from the previous loop into the pool. This data is
-	 * not considered to contain any entropy, but it stirs the pool a bit.
-	 */
-	sha3_update(ec->hash_state, intermediary, sizeof(intermediary));
-
-	/*
-	 * Insert the time stamp into the hash context representing the pool.
+	 * Insert the time stamp into the intermediary buffer after the message
+	 * digest of the intermediate data.
 	 *
 	 * If the time stamp is stuck, do not finally insert the value into the
-	 * entropy pool. Although this operation should not do any harm even
-	 * when the time stamp has no entropy, SP800-90B requires that any
+	 * intermediary buffer. Although this operation should not do any harm
+	 * even when the time stamp has no entropy, SP800-90B requires that any
 	 * conditioning operation to have an identical amount of input data
 	 * according to section 3.1.5.
 	 */
-	if (!stuck)
-		sha3_update(ec->hash_state, (uint8_t *)&time, sizeof(uint64_t));
+	if (!stuck) {
+		/* Insert the time. */
+		output_value = time;
+	} else {
+		/* The time is considered stuck. Insert the fixed value 0. */
+		output_value = 0;
+	}
+
+	memcpy(intermediary + SHA3_256_SIZE_DIGEST,
+	       (uint8_t *)&output_value, sizeof(uint64_t));
+
+	/*
+	 * Inject the data from the intermediary buffer, including the hash we
+	 * are using for timing, and (if the timer is not stuck) the time stamp.
+	 * Only the time is considered to contain any entropy. The intermediary
+	 * buffer is exactly SHA3-256-rate-size to always cause a Keccak
+	 * operation.
+	 */
+	sha3_update(ec->hash_state, intermediary, sizeof(intermediary));
 
 	jent_memset_secure(&ctx, SHA_MAX_CTX_SIZE);
 	jent_memset_secure(intermediary, sizeof(intermediary));
